@@ -1,0 +1,20 @@
+## Ignore files with no extension (executables)
+# Ignore all
+*
+# Unignore all dirs
+!/**/
+# Unignore all with extensions
+!*.*
+
+## Compiled Object files
+*.o
+
+## Compiled Dynamic libraries
+*.so
+
+## Compiled Static libraries
+*.a
+
+## Editor files/dirs
+.vscode
+
