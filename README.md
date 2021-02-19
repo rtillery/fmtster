@@ -70,9 +70,9 @@ C++20 `std::format` feature.)***
 ## **Options**
 In keeping with the design of {fmt}, `fmtster` provides the user optional style
 configuration specifiers. However, please note that the style format for
-`fmtster` specifiers differs from the {fmt} design, because the options being
-controlled are appropriate to container serialization. *Individual type
-formatting is not currently supported.*
+`fmtster` differs from the {fmt} design, because the options being controlled
+are appropriate to container serialization. *Individual type formatting is not
+currently supported.*
 
 <br>
 
@@ -162,7 +162,7 @@ Some proposed methods for how this field might be specified are:
 
 The third field indicates the type and length of the tabs:
 
-* Positive values indicate the number of spaces per tab (e.g. 4 indicates a tab consisting of 2 spaces)
+* Positive values indicate the number of spaces per tab (e.g. 4 indicates a tab consisting of 4 spaces)
 * Negative values indicate the number of tab characters per tab (e.g. -2 indictes a tab consisting of 2 hard tab ('\t') chracters)
 * 0 indicates no tabs
 
@@ -171,7 +171,8 @@ The third field indicates the type and length of the tabs:
 **Indent**
 
 The fourth field indicates the number of tab units used on all output lines.
-This is added to the tab used internally for formatting the serialization.
+This is added to the tab used internally for formatting the serialization, so
+that the entire output is indented together.
 
 **NOTE**: The indent specifier may be ignored when outputting the first line of
 a given container. This is due to the need to differentiate between tab levels
