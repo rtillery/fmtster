@@ -20,9 +20,8 @@
  * SOFTWARE.
 -->
 
-# <span style="font-weight:bold;font-family:monospace">fmtster</span>
-<span style="font-size:1.2em;font-weight:bold;font-family:monospace">fmtster</span>
-(format-ster) is designed to work with the
+# **fmtster**
+**`fmtster`** (format-ster) is designed to work with the
 [{fmt}](https://fmt.dev/latest/index.html) library. It provides
 `fmt::formatter` templates that allow
 [`std` C++ containers](https://en.cppreference.com/w/cpp/container) to be passed
@@ -60,10 +59,10 @@ and its (default) output:
 
 `fmtster` is obviously useful for serialization, but it is also a useful
 debugging aid, allowing quick dumping of `std` C++ containers to a `std::string`
-for logging during development.
-
-<span style="color:green">***(In the future, it is intended that `fmtster` will be modfied to work with the
-C++20 `std::format` feature.)***</span>
+for logging during development.<br>
+<br>
+***(In the future, it is intended that `fmtster` will be modfied to work with the
+C++20 `std::format` feature.)***
 
 ---
 <br>
@@ -87,8 +86,9 @@ values will be used. (Commas can be omitted after the last specifier provided.)
 
 **EXAMPLE**:
 
-> <span style="font-family:monospace">fmt::format(" &nbsp;&nbsp;&nbsp;{1}: {0:,,4,1}", myvector, "myvector")</span><br>
-> <br>
+> ```
+> fmt::format("    {1}: {0:,,4,1}", myvector, "myvector")
+> ```
 > This serializes a `std::vector<>` formatted as:
 > * JSON serialization format (the first field is empty, so the default serialization format is used)
 > * default JSON style (the second field is empty, so the default JSON style is
@@ -109,10 +109,10 @@ are:
 
 * **JSON**
   * 0
-  * json <span style="color:red">*(pending)*</span>
-  * j <span style="color:red">*(pending)*</span>
+  * json *(pending)*
+  * j *(pending)*
 
-* **XML** <span style="color:red">*(pending)*</span>
+* **XML** *(pending)*
 
 The JSON serialization format is the default.
 
@@ -131,13 +131,9 @@ The JSON format as specified at http://www.json.org
 The JSON format specifier includes four optional fields, including the
 serialization format specifier itself:
 
-> <span style="font-family:monospace">{:0,&lt;style&gt;,&lt;tab&gt;,&lt;indent&gt;}</span><br>
-> <span style="color:gray;font-family:monospace">{:json,&lt;style&gt;,&lt;tab&gt;,&lt;indent&gt;}</span>
-  <span style="color:red">*(pending)*</span><br>
-> <span style="color:gray;font-family:monospace">{:j,&lt;style&gt;,&lt;tab&gt;,&lt;indent&gt;}</span>
-  <span style="color:red">*(pending)*</span><br>
-
-<br>
+> `{:0,<style>,<tab>,<indent>}`<br>
+> `{:json,<style>,<tab>,<indent>}` *(pending)*<br>
+> `{:j,<style>,<tab>,<indent>}` *(pending)*<br>
 
 **Style**
 
@@ -149,17 +145,17 @@ of opening and closing braces and brackets, the spacing between punctuation and
 values, as well as exceptional choices like grouping short arrays on one line or
 placing single entry JSON object on one line, etc.<br>
 <br>
-<span style="color:red">**NOTE: The method of specifying the serialization format style is under
-consideration:**</span>
+<br>
+**NOTE: The method of specifying the serialization format style is under
+consideration:**
 
-<p style="color:gray">Some proposed methods for how this field might be
-specified are:
+Some proposed methods for how this field might be specified are:
 
-> <span style="color:gray;font-family:monospace">Bitfields:&nbsp;&nbsp;&nbsp;{:0,6,&lt;tab&gt;,&lt;indent&gt;}</span><br>
-> <span style="color:gray;font-family:monospace">Tags:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{:j,spc-after-lead-brace|one-element-array-on-one-line,&lt;tab&gt;,&lt;indent&gt;}</span><br>
-> <span style="color:gray;font-family:monospace">Struct ptr:&nbsp;&nbsp;{:0,0x123456789ABCDEF0,&lt;tab&gt;,&lt;indent&gt;}</span><br>
-</p>
-
+>```
+> Bitfields:   {:0,6,<tab>,<indent>}
+> Tags:        {:j,spc-after-lead-brac|one-line-one-element-array,<tab>,<indent>}
+> Struct ptr:  {:0,0x123456789ABCDEF0,<tab>,<indent>}
+> ```
 <br>
 
 **Tab**
@@ -179,16 +175,16 @@ This is added to the tab used internally for formatting the serialization.
 
 **NOTE**: The indent specifier may be ignored when outputting the first line of
 a given container. This is due to the need to differentiate between tab levels
-during recusive serialization of containers within containers.&nbsp;
-<span style="color:red">*A table will needs to be placed here to explain the
-behavior and options to the user.*</span>
+during recusive serialization of containers within containers.<br>
+<br>
+\*\* *A table will needs to be placed here to explain the behavior and options to the user.* \*\*
 
 <br>
 
 ### **XML**
 The XML format as specified at https://www.w3.org/standards/xml/core
 
-<span style="color:red">**Support of XML is TBD.**</span>
+**Support of XML is TBD.**
 
 ---
 <br>
@@ -196,9 +192,9 @@ The XML format as specified at https://www.w3.org/standards/xml/core
 ## **Global Serialization Format Specification**
 <br>
 
-<span style="color:red">*Providing serialization formatting on each use of
+*Providing serialization formatting on each use of
 `fmtster` can become burdensome. A method to provide a global format
 specification to override the default settings seems like a worthwhile addition.
 However, consideration of the side-effects, such as use of `fmtster` by multiple
 modules in the same process, will necessitate more consideration of an exact
-approach.*</span>
+approach.*
