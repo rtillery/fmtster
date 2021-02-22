@@ -22,29 +22,24 @@
  */
 
 #include <algorithm>
-using std::find;
-
 #include <exception>
-using std::exception;
-
 #include <fmt/core.h>
 #include <fmt/format.h>
-
 #include <regex>
-
 #include <string>
+#include <type_traits>
+
+namespace fmtster
+{
+using std::find;
+using std::exception;
 using std::string;
 using std::stoi;
-
-#include <type_traits>
 using std::declval;
 using std::void_t;
 using std::enable_if;
 using std::is_same;
 using std::integral_constant;
-
-namespace fmtster
-{
 
 template<typename ...Args>
 std::string F(std::string_view fmt, const Args&... args)
