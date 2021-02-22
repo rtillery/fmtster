@@ -23,6 +23,8 @@
 using std::cout;
 using std::endl;
 
+#include <algorithm>
+using std::find;
 #include <array>
 using std::array;
 #include <vector>
@@ -59,6 +61,9 @@ using namespace std::string_literals;
 #include <tuple>
 using std::tuple;
 using std::make_tuple;
+
+#include <type_traits>
+using std::void_t;
 
 #include <gtest/gtest.h>
 
