@@ -19,8 +19,6 @@
  * SOFTWARE.
  */
 
-// $ LD_LIBRARY_PATH=../fmt/build ./fmtstertest
-
 #include <iostream>
 using std::cout;
 using std::endl;
@@ -216,6 +214,25 @@ std::enable_if_t<!has_push_back<C, typename C::value_type>::value
     return cData;
 }
 
+template<class T>
+struct is_array : std::false_type
+{};
+
+template<class T, std::size_t N>
+struct is_array<std::array<T,N> > : std::true_type
+{};
+
+template<typename C>
+std::enable_if_t<is_array<C>::value,
+                 C> CreateContainer()
+{
+    C cData;
+    size_t i = 0;
+    for (auto e : GetValueContainerData<typename C::value_type>())
+        cData[i++] = e;
+    return cData;
+}
+
 template<typename C>
 std::enable_if_t<is_keyval_container<C>::value,
                  C> CreateContainer()
@@ -304,7 +321,7 @@ std::enable_if_t<is_adapter<C>::value,
 
 /* test macros */
 
-#define VALCNTRTESTINTERNAL(CONT, DATA) \
+#define VALUECONTAINERTEST_INTERNAL(DATA) \
 { \
     auto data = DATA; \
     string str = F("{}", data); \
@@ -314,33 +331,51 @@ cout << str << endl; \
     EXPECT_EQ(ref, str) << F("ref: {}\nstr: {}", ref, str); \
 }
 
-#define VALCNTRTEST(CONT, TYPE) \
+#define ARRAYCONTAINERTEST(TYPE) \
+TEST_F(FmtsterTest, array_of_ ## TYPE ## s_to_JSON) \
+VALUECONTAINERTEST_INTERNAL((CreateContainer<array<TYPE, 3> >()))
+
+#define EMPTYARRAYCONTAINERTEST(TYPE) \
+TEST_F(FmtsterTest, empty_array_of_ ## TYPE ## s_to_JSON) \
+VALUECONTAINERTEST_INTERNAL((array<TYPE, 0>{}))
+
+#define VALUECONTAINERTEST(CONT, TYPE) \
 TEST_F(FmtsterTest, CONT ## _of_ ## TYPE ## s_to_JSON) \
-VALCNTRTESTINTERNAL(CONT, CreateContainer<CONT<TYPE> >())
+VALUECONTAINERTEST_INTERNAL(CreateContainer<CONT<TYPE> >())
 
-#define KEYVALCNTRTEST(CONT, KEYTYPE, VALTYPE) \
-TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## _to_JSON) \
-VALCNTRTESTINTERNAL(CONT, (CreateContainer<CONT<KEYTYPE,VALTYPE> >()))
-
-#define EMPTYVALCNTRTEST(CONT, TYPE) \
+#define EMPTYVALUECONTAINERTEST(CONT, TYPE) \
 TEST_F(FmtsterTest, empty_ ## CONT ## _of_ ## TYPE ## s_to_JSON) \
-VALCNTRTESTINTERNAL(CONT, CONT<TYPE>{})
+VALUECONTAINERTEST_INTERNAL(CONT<TYPE>{})
 
-#define VALCNTRTESTS(CONT) \
-EMPTYVALCNTRTEST(CONT, string) \
-VALCNTRTEST(CONT, string) \
-EMPTYVALCNTRTEST(CONT, int) \
-VALCNTRTEST(CONT, int) \
-EMPTYVALCNTRTEST(CONT, float) \
-VALCNTRTEST(CONT, float) \
-EMPTYVALCNTRTEST(CONT, bool) \
-VALCNTRTEST(CONT, bool)
+#define KEYVALUECONTAINERTEST(CONT, KEYTYPE, VALTYPE) \
+TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## _to_JSON) \
+VALUECONTAINERTEST_INTERNAL((CreateContainer<CONT<KEYTYPE,VALTYPE> >()))
 
-#define KEYVALCNTRTESTS(CONT) \
-KEYVALCNTRTEST(CONT, string, string) \
-KEYVALCNTRTEST(CONT, string, int) \
-KEYVALCNTRTEST(CONT, string, float) \
-KEYVALCNTRTEST(CONT, string, bool)
+#define ARRAYCONTAINERTESTS() \
+EMPTYARRAYCONTAINERTEST(string) \
+ARRAYCONTAINERTEST(string) \
+EMPTYARRAYCONTAINERTEST(int) \
+ARRAYCONTAINERTEST(int) \
+EMPTYARRAYCONTAINERTEST(float) \
+ARRAYCONTAINERTEST(float) \
+EMPTYARRAYCONTAINERTEST(bool) \
+ARRAYCONTAINERTEST(bool)
+
+#define VALUECONTAINERTESTS(CONT) \
+EMPTYVALUECONTAINERTEST(CONT, string) \
+VALUECONTAINERTEST(CONT, string) \
+EMPTYVALUECONTAINERTEST(CONT, int) \
+VALUECONTAINERTEST(CONT, int) \
+EMPTYVALUECONTAINERTEST(CONT, float) \
+VALUECONTAINERTEST(CONT, float) \
+EMPTYVALUECONTAINERTEST(CONT, bool) \
+VALUECONTAINERTEST(CONT, bool)
+
+#define KEYVALUECONTAINERTESTS(CONT) \
+KEYVALUECONTAINERTEST(CONT, string, string) \
+KEYVALUECONTAINERTEST(CONT, string, int) \
+KEYVALUECONTAINERTEST(CONT, string, float) \
+KEYVALUECONTAINERTEST(CONT, string, bool)
 
 /* test object */
 
@@ -384,25 +419,32 @@ TEST_F(FmtsterTest, Reference)
 
 // value container tests
 
-// VALCNTRTESTS(array)
-VALCNTRTESTS(vector)
-VALCNTRTESTS(forward_list)
-VALCNTRTESTS(list)
-VALCNTRTESTS(deque)
-VALCNTRTESTS(set)
-VALCNTRTESTS(unordered_set)
-VALCNTRTESTS(multiset)
-VALCNTRTESTS(unordered_multiset)
-VALCNTRTESTS(stack)
-// VALCNTRTESTS(queue)
-// VALCNTRTESTS(priority_queue)
+ARRAYCONTAINERTESTS()
+VALUECONTAINERTESTS(vector)
+VALUECONTAINERTESTS(forward_list)
+VALUECONTAINERTESTS(list)
+VALUECONTAINERTESTS(deque)
+VALUECONTAINERTESTS(set)
+VALUECONTAINERTESTS(unordered_set)
+VALUECONTAINERTESTS(multiset)
+VALUECONTAINERTESTS(unordered_multiset)
+VALUECONTAINERTESTS(stack)
+// VALUECONTAINERTESTS(queue)
+// VALUECONTAINERTESTS(priority_queue)
+
+array<string, 3> CreateContainer()
+{
+    array<string, 3> a3;
+
+    return a3;
+}
 
 // key/value container tests
 
-KEYVALCNTRTESTS(map)
-KEYVALCNTRTESTS(unordered_map)
-// KEYVALCNTRTESTS(multimap)
-// KEYVALCNTRTESTS(unordered_multimap)
+KEYVALUECONTAINERTESTS(map)
+KEYVALUECONTAINERTESTS(unordered_map)
+// KEYVALUECONTAINERTESTS(multimap)
+// KEYVALUECONTAINERTESTS(unordered_multimap)
 
 #if 0
 
