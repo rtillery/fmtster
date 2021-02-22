@@ -1,7 +1,7 @@
 
 CXX=g++
 LD=ld
-CFLAGS=-std=c++17 -I../fmt/include
+CFLAGS=-std=c++17
 LFLAGS=-L../fmt/build
 LIBS=-lgtest -lgtest_main -lpthread -lfmt
 
