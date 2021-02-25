@@ -21,7 +21,7 @@
 CXX=g++
 LD=ld
 CFLAGS=-std=c++17
-LFLAGS=-L../fmt/build
+LFLAGS=
 LIBS=-lgtest -lgtest_main -lpthread -lfmt
 
 all: fmtstertest
