@@ -353,7 +353,7 @@ TEST_F(FmtsterTest, empty_ ## CONT ## _of_ ## TYPE ## s_to_JSON) \
 VALUECONTAINERTEST_INTERNAL(CONT<TYPE>{})
 
 #define KEYVALUECONTAINERTEST(CONT, KEYTYPE, VALTYPE) \
-TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## _to_JSON) \
+TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## s_to_JSON) \
 VALUECONTAINERTEST_INTERNAL((CreateContainer<CONT<KEYTYPE,VALTYPE> >()))
 
 #define ARRAYCONTAINERTESTS() \
@@ -451,63 +451,7 @@ KEYVALUECONTAINERTESTS(unordered_map)
 // KEYVALUECONTAINERTESTS(multimap)
 // KEYVALUECONTAINERTESTS(unordered_multimap)
 
-#if 0
-
-#define BOOLCOLOR(torf) F("\x1B[{}m{}\033[0m", torf ? 32 : 31, torf)
-
-TEST_F(FmtsterTest, MapOfStrings_ToJSON)
-{
-    map<string, string> mapofstrings =
-    {
-        { "entry1", "value1" },
-        { "entry2", "value2" }
-    };
-    const string ref =
-        "{\n"
-        "  \"entry1\": \"value1\",\n"
-        "  \"entry2\": \"value2\"\n"
-        "}";
-    string str = F("{}", mapofstrings);
-cout << str << endl;
-    EXPECT_EQ(ref, str);
-}
-
-TEST_F(FmtsterTest, MapOfInts_ToJSON)
-{
-    map<string, int> mapofints =
-    {
-        { "entry1", 1 },
-        { "entry2", 2 }
-    };
-    const string ref =
-        "{\n"
-        "  \"entry1\": 1,\n"
-        "  \"entry2\": 2\n"
-        "}";
-    string str = F("{}", mapofints);
-cout << str << endl;
-    EXPECT_EQ(ref, str);
-}
-
-TEST_F(FmtsterTest, UnorderedMapOfStrings_ToJSON)
-{
-    unordered_map<string, string> mapofstrings =
-    {
-        { "entry1", "value1" },
-        { "entry2", "value2" }
-    };
-    // @@@ Order of entries is IMPLEMENTATION DEPENDENT
-    const string ref =
-        "{\n"
-        "  \"entry2\": \"value2\",\n"
-        "  \"entry1\": \"value1\"\n"
-        "}";
-    string str = F("{}", mapofstrings);
-cout << str << endl;
-    EXPECT_EQ(ref, str);
-}
-
-TEST_F(FmtsterTest, MapOfMapOfStrings_ToJSON)
+TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON)
 {
     map<string, map<string, string> > mapofmapofstrings =
     {
@@ -542,7 +486,7 @@ cout << str << endl;
     EXPECT_EQ(ref, str);
 }
 
-TEST_F(FmtsterTest, MapOfMapOfStrings_ToJSON_4SpaceTab)
+TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON_4SpaceTab)
 {
     map<string, map<string, string> > mapofmapofstrings =
     {
@@ -577,7 +521,7 @@ cout << str << endl;
     EXPECT_EQ(ref, str);
 }
 
-TEST_F(FmtsterTest, MapOfVectorsOfStrings_ToJSON)
+TEST_F(FmtsterTest, map_of_vectors_of_strings_to_JSON)
 {
     map<string, vector<string> > mapofvectorofstrings =
     {
@@ -611,5 +555,3 @@ TEST_F(FmtsterTest, MapOfVectorsOfStrings_ToJSON)
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
-
-#endif // 0
