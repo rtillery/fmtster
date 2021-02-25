@@ -40,9 +40,14 @@ using std::void_t;
 using std::enable_if;
 using std::is_same;
 using std::integral_constant;
+using std::true_type;
+using std::false_type;
+using std::declval;
+using std::void_t;
+using fmt::format;
 
 template<typename ...Args>
-std::string F(std::string_view fmt, const Args&... args)
+string F(std::string_view fmt, const Args&... args)
 {
     return fmt::format(fmt, args...);
 }
@@ -51,29 +56,29 @@ namespace internal
 {
 
 template<typename T, typename = void>
-struct has_const_iterator : std::false_type
+struct has_const_iterator : false_type
 {};
 
 template<typename T>
 struct has_const_iterator<T, void_t<typename T::const_iterator> >
-    : std::true_type
+    : true_type
 {};
 
 // https://stackoverflow.com/a/30848101/3705286
 //
 template<typename, template<typename> class, typename = void_t<> >
-struct detect : std::false_type
+struct detect : false_type
 {};
 
 template<typename T, template<typename> class Fn>
-struct detect<T, Fn, std::void_t<Fn<T> > > : std::true_type
+struct detect<T, Fn, void_t<Fn<T> > > : true_type
 {};
 
 template<typename T>
-using has_begin_t = decltype(std::declval<T>().begin());
+using has_begin_t = decltype(declval<T>().begin());
 
 template<typename T>
-using has_end_t = decltype(std::declval<T>().end());
+using has_end_t = decltype(declval<T>().end());
 
 template<typename T>
 using has_begin = detect<T, has_begin_t>;
@@ -92,20 +97,20 @@ struct is_container
 {};
 
 template<>
-struct is_container<string> : std::false_type
+struct is_container<string> : false_type
 {};
 
 // based on https://stackoverflow.com/a/35293958/3705286
 //
 template<typename T, typename U = void>
-struct is_mappish : std::false_type
+struct is_mappish : false_type
 {};
 
 template<typename T>
 struct is_mappish<T, void_t<typename T::key_type,
                             typename T::mapped_type,
-                            decltype(std::declval<T&>()[std::declval<const typename T::key_type&>()])>>
-    : std::true_type
+                            decltype(declval<T&>()[declval<const typename T::key_type&>()])>>
+    : true_type
 {};
 //
 ///////////////////////////////////////
@@ -113,12 +118,12 @@ struct is_mappish<T, void_t<typename T::key_type,
 // stack: https://stackoverflow.com/a/29325258/3705286
 
 template<typename, typename = void>
-struct is_adapter : std::false_type
+struct is_adapter : false_type
 {};
 
 template<typename T>
 struct is_adapter<T, void_t<typename T::container_type> >
-    : std::true_type
+    : true_type
 {};
 
 } // namespace internal
@@ -248,7 +253,7 @@ struct fmt::formatter<T,
         // begin constructing format string for possibly recursive F() call
         // below, used for each entry in the map:
         //   {indent}{tab}
-        const string fmtPrefix("{}{}");
+        const std::string fmtPrefix("{}{}");
 
         // iterate through and output each entry
         // all this iterator fun is to detect the last entry for the comma
@@ -259,7 +264,7 @@ struct fmt::formatter<T,
         {
             auto val = *itSC;
             itSC++;
-            string nextFmtStr(fmtPrefix);
+            std::string nextFmtStr(fmtPrefix);
             nextFmtStr += appendValueFormatString(val, itSC != sc.end());
             // use format above
             itOut = format_to(itOut, nextFmtStr, mIndent, mTab, val);
@@ -289,13 +294,13 @@ struct fmt::formatter<T,
         // begin constructing format string for possibly recursive F() call
         // below, used for each entry in the map:
         //   {indent}{tab}\"{key}\"
-        const string fmtPrefix("{}{}\"{}\": ");
+        const std::string fmtPrefix("{}{}\"{}\": ");
 
         // iterate through and output each entry
         auto remainingElements = ac.size();
         for (const auto [key, val] : ac)
         {
-            string nextFmtStr(fmtPrefix);
+            std::string nextFmtStr(fmtPrefix);
             nextFmtStr += appendValueFormatString(val, --remainingElements != 0);
             itOut = format_to(itOut, nextFmtStr, mIndent, mTab, key, val);
         }
@@ -308,15 +313,15 @@ struct fmt::formatter<T,
 };
 
 template<typename T>
-struct fmt::formatter<stack<T> >
+struct fmt::formatter<std::stack<T> >
 {
-    string mStrFmt;
+    std::string mStrFmt;
 
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
         auto itCtxEnd = find(ctx.begin(), ctx.end(), '}');
-        mStrFmt = "{" + string(ctx.begin(), itCtxEnd) + "}";
+        mStrFmt = "{" + std::string(ctx.begin(), itCtxEnd) + "}";
         return itCtxEnd;
     }
 
@@ -334,7 +339,7 @@ struct fmt::formatter<stack<T> >
     }
 
     template<typename FormatContext>
-    auto format(const stack<T>& ac, FormatContext& ctx)
+    auto format(const std::stack<T>& ac, FormatContext& ctx)
     {
         return format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
     }
