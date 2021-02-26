@@ -115,8 +115,6 @@ struct is_mappish<T, void_t<typename T::key_type,
 //
 ///////////////////////////////////////
 
-// stack: https://stackoverflow.com/a/29325258/3705286
-
 template<typename, typename = void>
 struct is_adapter : false_type
 {};
@@ -312,8 +310,10 @@ struct fmt::formatter<T,
     }
 };
 
-template<typename T>
-struct fmt::formatter<std::stack<T> >
+template<typename A, typename Char>
+struct fmt::formatter<A,
+                      Char,
+                      std::enable_if_t<fmtster::internal::is_adapter<A>::value> >
 {
     std::string mStrFmt;
 
@@ -325,6 +325,7 @@ struct fmt::formatter<std::stack<T> >
         return itCtxEnd;
     }
 
+    // https://stackoverflow.com/a/29325258/3705286
     template <class ADAPTER>
     static typename ADAPTER::container_type const& GetAdapterContainer(ADAPTER &a)
     {
@@ -339,7 +340,7 @@ struct fmt::formatter<std::stack<T> >
     }
 
     template<typename FormatContext>
-    auto format(const std::stack<T>& ac, FormatContext& ctx)
+    auto format(const A& ac, FormatContext& ctx)
     {
         return format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
     }

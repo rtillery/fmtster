@@ -434,8 +434,8 @@ VALUECONTAINERTESTS(unordered_set)
 VALUECONTAINERTESTS(multiset)
 VALUECONTAINERTESTS(unordered_multiset)
 VALUECONTAINERTESTS(stack)
-// VALUECONTAINERTESTS(queue)
-// VALUECONTAINERTESTS(priority_queue)
+VALUECONTAINERTESTS(queue)
+VALUECONTAINERTESTS(priority_queue)
 
 array<string, 3> CreateContainer()
 {
