@@ -37,15 +37,16 @@ using std::string;
 using std::stoi;
 using std::declval;
 using std::void_t;
-using std::enable_if;
+using std::enable_if_t;
 using std::is_same;
 using std::integral_constant;
 using std::true_type;
 using std::false_type;
-using std::declval;
-using std::void_t;
-using fmt::format;
+using std::conjunction_v;
+using std::negation;
 
+// short helper alias for fmt::format() used by adding "using fmtster::F;" to
+//  client code
 template<typename ...Args>
 string F(std::string_view fmt, const Args&... args)
 {
@@ -55,74 +56,75 @@ string F(std::string_view fmt, const Args&... args)
 namespace internal
 {
 
-template<typename T, typename = void>
-struct has_const_iterator : false_type
+template<typename>
+struct fmtster_true : true_type
 {};
 
+#define fmtster_MAKEHASFN(FN)                                               \
+template<typename T, typename... Args>                                      \
+static auto test_ ## FN(int)                                                \
+    -> fmtster_true<decltype(declval<T>().FN(declval<Args>()...))>;         \
+                                                                            \
+template<typename, typename...>                                             \
+static auto test_ ## FN(long) -> false_type;                                \
+                                                                            \
+template<typename T, typename... Args>                                      \
+struct has_ ## FN : decltype(test_ ## FN<T, Args...>(0))                    \
+{};                                                                         \
+                                                                            \
+template<typename ...Ts>                                                    \
+inline constexpr bool has_ ## FN ## _v = has_ ## FN<Ts...>::value
+
+#define fmtster_MAKEHASTYPE(TYPE)                                           \
+template<typename T, typename = void>                                       \
+struct has_ ## TYPE : false_type                                            \
+{};                                                                         \
+                                                                            \
+template<typename T>                                                        \
+struct has_ ## TYPE<T, void_t<typename T::TYPE> >                           \
+    : true_type                                                             \
+{};                                                                         \
+                                                                            \
+template<typename ...Ts>                                                    \
+inline constexpr bool has_ ## TYPE ## _v = has_ ## TYPE<Ts...>::value
+
+#define fmtster_MAKEIS(ID, COND)                                            \
+template<typename T, typename = void>                                       \
+struct is_ ## ID : false_type                                               \
+{};                                                                         \
+                                                                            \
+template<typename T>                                                        \
+struct is_ ## ID<T, enable_if_t<COND> > : true_type                         \
+{};                                                                         \
+                                                                            \
+template<typename ...Ts>                                                    \
+inline constexpr bool is_ ## ID ## _v = is_ ## ID<Ts...>::value
+
+fmtster_MAKEHASTYPE(const_iterator);
+fmtster_MAKEHASTYPE(key_type);
+fmtster_MAKEHASTYPE(mapped_type);
+fmtster_MAKEHASTYPE(container_type);
+
+fmtster_MAKEHASFN(begin);
+fmtster_MAKEHASFN(end);
+fmtster_MAKEHASFN(at);
+// fmtster_MAKEHASFN(operator[])
+template<typename T, typename U = void>
+struct has_operator_index : false_type
+{};
 template<typename T>
-struct has_const_iterator<T, void_t<typename T::const_iterator> >
+struct has_operator_index<T, void_t<decltype(declval<T&>()[declval<const typename T::key_type&>()])> >
     : true_type
 {};
 
-// https://stackoverflow.com/a/30848101/3705286
-//
-template<typename, template<typename> class, typename = void_t<> >
-struct detect : false_type
-{};
-
-template<typename T, template<typename> class Fn>
-struct detect<T, Fn, void_t<Fn<T> > > : true_type
-{};
-
-template<typename T>
-using has_begin_t = decltype(declval<T>().begin());
-
-template<typename T>
-using has_end_t = decltype(declval<T>().end());
-
-template<typename T>
-using has_begin = detect<T, has_begin_t>;
-
-template<typename T>
-using has_end = detect<T, has_end_t>;
-//
-///////////////////////////////////////
-
-template<typename T>
-struct is_container
-    : integral_constant<bool,
-                        has_const_iterator<T>::value
-                        && has_begin<T>::value
-                        && has_end<T>::value>
-{};
-
+fmtster_MAKEIS(container, (conjunction_v<has_const_iterator<T>, has_begin<T>, has_end<T> >));
+// specialization for std::string, which is not considered a container
 template<>
 struct is_container<string> : false_type
 {};
-
-// based on https://stackoverflow.com/a/35293958/3705286
-//
-template<typename T, typename U = void>
-struct is_mappish : false_type
-{};
-
-template<typename T>
-struct is_mappish<T, void_t<typename T::key_type,
-                            typename T::mapped_type,
-                            decltype(declval<T&>()[declval<const typename T::key_type&>()])>>
-    : true_type
-{};
-//
-///////////////////////////////////////
-
-template<typename, typename = void>
-struct is_adapter : false_type
-{};
-
-template<typename T>
-struct is_adapter<T, void_t<typename T::container_type> >
-    : true_type
-{};
+fmtster_MAKEIS(mappish, (conjunction_v<has_key_type<T>, has_mapped_type<T>, has_operator_index<T> >));
+fmtster_MAKEIS(multimappish, (conjunction_v<has_key_type<T>, has_mapped_type<T>, negation<has_at<T, typename T::key_type> > >));
+fmtster_MAKEIS(adapter, has_container_type_v<T>);
 
 } // namespace internal
 
@@ -230,13 +232,48 @@ struct FmtsterBase
     }
 };
 
+template<typename T>
+struct FmtsterMapBase : FmtsterBase
+{
+    template<typename FormatContext>
+    auto format(const T& ac, FormatContext& ctx)
+    {
+        // get starting output iterator
+        auto itOut = ctx.out();
+
+        // output opening brace
+        itOut = fmt::format_to(itOut, "{{\n");
+
+        // begin constructing format string for possibly recursive F() call
+        // below, used for each entry in the map:
+        //   {indent}{tab}\"{key}\"
+        const std::string fmtPrefix("{}{}\"{}\": ");
+
+        // iterate through and output each entry
+        auto remainingElements = ac.size();
+        for (const auto [key, val] : ac)
+        {
+            std::string nextFmtStr(fmtPrefix);
+            nextFmtStr += appendValueFormatString(val, --remainingElements != 0);
+            itOut = fmt::format_to(itOut, nextFmtStr, mIndent, mTab, key, val);
+        }
+
+        // output closing brace
+        itOut = fmt::format_to(itOut, "{}}}", mIndent);
+
+        return itOut;
+    }
+};
+
 } // namespace fmtster
 
+// single value per entry containers
 template<typename T, typename Char>
 struct fmt::formatter<T,
                       Char,
-                      std::enable_if_t<fmtster::internal::is_container<T>::value
-                                       && !fmtster::internal::is_mappish<T>::value> >
+                      std::enable_if_t<std::conjunction_v<fmtster::internal::is_container<T>,
+                                                          std::negation<fmtster::internal::is_mappish<T> >,
+                                                          std::negation<fmtster::internal::is_multimappish<T> > > > >
     : fmtster::FmtsterBase
 {
     template<typename FormatContext>
@@ -246,7 +283,7 @@ struct fmt::formatter<T,
         auto itOut = ctx.out();
 
         // output opening bracket
-        itOut = format_to(itOut, "[\n");
+        itOut = fmt::format_to(itOut, "[\n");
 
         // begin constructing format string for possibly recursive F() call
         // below, used for each entry in the map:
@@ -265,51 +302,33 @@ struct fmt::formatter<T,
             std::string nextFmtStr(fmtPrefix);
             nextFmtStr += appendValueFormatString(val, itSC != sc.end());
             // use format above
-            itOut = format_to(itOut, nextFmtStr, mIndent, mTab, val);
+            itOut = fmt::format_to(itOut, nextFmtStr, mIndent, mTab, val);
         }
         // output closing brace
-        itOut = format_to(itOut, "{}]", mIndent);
+        itOut = fmt::format_to(itOut, "{}]", mIndent);
         return itOut;
     }
 };
 
+// unique key key/value containers
 template<typename T, typename Char>
 struct fmt::formatter<T,
                       Char,
-                      std::enable_if_t<fmtster::internal::is_container<T>::value
-                                       && fmtster::internal::is_mappish<T>::value> >
-    : fmtster::FmtsterBase
-{
-    template<typename FormatContext>
-    auto format(const T& ac, FormatContext& ctx)
-    {
-        // get starting output iterator
-        auto itOut = ctx.out();
+                      std::enable_if_t<std::conjunction_v<fmtster::internal::is_container<T>,
+                                                          fmtster::internal::is_mappish<T> > > >
+    : fmtster::FmtsterMapBase<T>
+{};
 
-        // output opening brace
-        itOut = format_to(itOut, "{{\n");
+// multiple key key/value containers
+template<typename T, typename Char>
+struct fmt::formatter<T,
+                      Char,
+                      std::enable_if_t<std::conjunction_v<fmtster::internal::is_container<T>,
+                                                          fmtster::internal::is_multimappish<T> > > >
+    : fmtster::FmtsterMapBase<T>
+{};
 
-        // begin constructing format string for possibly recursive F() call
-        // below, used for each entry in the map:
-        //   {indent}{tab}\"{key}\"
-        const std::string fmtPrefix("{}{}\"{}\": ");
-
-        // iterate through and output each entry
-        auto remainingElements = ac.size();
-        for (const auto [key, val] : ac)
-        {
-            std::string nextFmtStr(fmtPrefix);
-            nextFmtStr += appendValueFormatString(val, --remainingElements != 0);
-            itOut = format_to(itOut, nextFmtStr, mIndent, mTab, key, val);
-        }
-
-        // output closing brace
-        itOut = format_to(itOut, "{}}}", mIndent);
-
-        return itOut;
-    }
-};
-
+// adapters
 template<typename A, typename Char>
 struct fmt::formatter<A,
                       Char,
@@ -325,7 +344,6 @@ struct fmt::formatter<A,
         return itCtxEnd;
     }
 
-    // https://stackoverflow.com/a/29325258/3705286
     template <class ADAPTER>
     static typename ADAPTER::container_type const& GetAdapterContainer(ADAPTER &a)
     {
@@ -342,6 +360,6 @@ struct fmt::formatter<A,
     template<typename FormatContext>
     auto format(const A& ac, FormatContext& ctx)
     {
-        return format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
+        return fmt::format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
     }
 };
