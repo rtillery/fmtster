@@ -128,14 +128,99 @@ fmtster_MAKEIS(adapter, has_container_type_v<T>);
 
 } // namespace internal
 
+const uint CRTN         = 0b1000;
+const uint WS_IS_SPACE  = 0b0000;
+const uint WS_IS_INDENT = 0b0100;
+const uint WS1          = 0b0010;
+const uint WS2          = 0b0001;
+
+enum struct SEP_FMT
+{
+    NOTHING    = 0,
+    SPC        =        WS_IS_SPACE  + WS1,
+    SPC_SPC    =        WS_IS_SPACE  + WS1 + WS2,
+    IND        =        WS_IS_INDENT + WS1,
+    IND_IND    =        WS_IS_INDENT + WS1 + WS2,
+    CR         = CRTN,
+    CR_SPC     = CRTN + WS_IS_SPACE  + WS1,
+    CR_SPC_SPC = CRTN + WS_IS_SPACE  + WS1 + WS2,
+    CR_IND     = CRTN + WS_IS_INDENT + WS1,
+    CR_IND_IND = CRTN + WS_IS_INDENT + WS1 + WS2
+};
+
+struct JSONStyle
+{
+    bool SEP_FLAG : 1;
+    SEP_FMT array_opt_0 : 4;
+    SEP_FMT array_opt_1 : 4;
+    SEP_FMT array_opt_2 : 4;
+    SEP_FMT object_opt_0 : 4;
+    SEP_FMT object_opt_1 : 4;
+    SEP_FMT object_opt_2 : 4;
+    SEP_FMT object_opt_3 : 4;
+    SEP_FMT object_opt_4 : 4;
+    SEP_FMT object_opt_5 : 4;
+    SEP_FMT object_opt_6 : 4;
+};
+
+inline constexpr JSONStyle DEFAULTJSONSTYLE =
+{
+    true,
+    SEP_FMT::CR_IND,
+    SEP_FMT::SPC,
+    SEP_FMT::SPC,
+    SEP_FMT::CR_IND,
+    SEP_FMT::NOTHING,
+    SEP_FMT::SPC,
+    SEP_FMT::CR_IND,
+    SEP_FMT::NOTHING,
+    SEP_FMT::SPC,
+    SEP_FMT::CR
+};
+
+JSONStyle gDefaultJSONStyle = DEFAULTJSONSTYLE;
+
+union JSONConverter
+{
+    JSONStyle style;
+    uint64_t value;
+};
+
+static_assert(sizeof(JSONConverter) == sizeof(uint64_t));
+
 struct FmtsterBase
 {
     int mFormatSetting = 0;
-    int mStyleSetting = 0;
+    JSONConverter mStyleSetting{gDefaultJSONStyle};
     int mTabSetting = 2;
     int mIndentSetting = 0;
     string mTab;
     string mIndent;
+
+    string getOptString(SEP_FMT sepFmt)
+    {
+        string strOpt;
+        if ((uint)sepFmt & CRTN)
+            strOpt += '\n' + mIndent;
+        if ((uint)sepFmt & WS1)
+        {
+            if ((uint)sepFmt & WS_IS_INDENT)
+            {
+                if ((uint)sepFmt & WS2)
+                    strOpt += mTab + mTab;
+                else
+                    strOpt += mTab;
+            }
+            else
+            {
+                if ((uint)sepFmt & WS2)
+                    strOpt += "  ";
+                else
+                    strOpt += " ";
+            }
+        }
+        return strOpt;
+    }
 
     // Parses the format choice argument id in the format {<format>,<style>,<tab>,<indent>}.
     // format (default is 0: JSON):
@@ -171,9 +256,9 @@ struct FmtsterBase
         auto smStyle = sm[2].str();
         if (!smStyle.empty())
         {
-            mStyleSetting = stoi(smStyle);
-            if (mStyleSetting != 0)
-                throw fmt::format_error(F("invalid style (\"{}\") for format \"{}\"", mStyleSetting, mFormatSetting));
+            uint64_t styleValue = stoull(smStyle, 0);
+            if (styleValue)
+                mStyleSetting.value = styleValue;
         }
 
         auto smTab = sm[3].str();
@@ -190,9 +275,9 @@ struct FmtsterBase
                 throw fmt::format_error(F("invalid indent: \"{}\"", mIndentSetting));
         }
 
-        mTab = ((mTabSetting > 0)       ?
-              string(mTabSetting, ' ') :
-              string(-mTabSetting, '\t'));
+        mTab = ((mTabSetting > 0)
+               ? string(mTabSetting, ' ')
+               : string(-mTabSetting, '\t'));
         mIndent.clear();
         for (int i = 0; i < mIndentSetting; i++)
             mIndent += mTab;
@@ -203,12 +288,22 @@ struct FmtsterBase
     template<typename T>
     string appendFormatString(const T&, bool addComma)
     {
-        return addComma ? "{},\n" : "{}\n";
+        if (addComma)
+//             return "{}," + getOptString(mStyleSetting.style.array_opt_1);
+return "{}," + getOptString(SEP_FMT::CR);
+        else
+//             return "{}" + getOptString(mStyleSetting.style.array_opt_2);
+return "{}" + getOptString(SEP_FMT::CR);
     }
 
     string appendFormatString(const string&, bool addComma)
     {
-        return addComma ? "\"{}\",\n" : "\"{}\"\n";
+        if (addComma)
+//             return "\"{}\"," + getOptString(mStyleSetting.style.array_opt_1);
+return "\"{}\"," + getOptString(SEP_FMT::CR);
+        else
+//             return "\"{}\"" + getOptString(mStyleSetting.style.array_opt_2);
+return "\"{}\"" + getOptString(SEP_FMT::CR);
     }
 
     template <typename T>
@@ -220,7 +315,7 @@ struct FmtsterBase
         {
             return F("{{:{},{},{},{}}}{}\n",
                      mFormatSetting,
-                     mStyleSetting,
+                     mStyleSetting.value,
                      mTabSetting,
                      mIndentSetting + 1,
                      addComma ? "," : "");
@@ -361,5 +456,22 @@ struct fmt::formatter<A,
     auto format(const A& ac, FormatContext& ctx)
     {
         return fmt::format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
+    }
+};
+
+template<>
+struct fmt::formatter<fmtster::JSONStyle>
+{
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
+    {
+        return find(ctx.begin(), ctx.end(), '}');
+    }
+
+    template<typename FormatContext>
+    auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
+    {
+        fmtster::JSONConverter jsonStyle{style};
+        return fmt::format_to(ctx.out(), "{:#x}", jsonStyle.value);
     }
 };

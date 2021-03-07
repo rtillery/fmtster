@@ -300,61 +300,64 @@ enable_if_t<is_adapter_v<C>,
 
 /* test macros */
 
-#define VALUECONTAINERTEST_INTERNAL(DATA) \
-{ \
-    auto data = DATA; \
-    string str = F("{}", data); \
-cout << str << endl; \
-    auto ref = GetReference(data); \
-/* cout << ref << endl; */ \
-    EXPECT_EQ(ref, str) << F("ref: {}\nstr: {}", ref, str); \
+#define VALUECONTAINERTEST_INTERNAL(DATA)                                   \
+{                                                                           \
+    auto data = DATA;                                                       \
+    string str = F("{}", data);                                             \
+cout << str << endl;                                                        \
+    auto ref = GetReference(data);                                          \
+/* cout << ref << endl; */                                                  \
+    EXPECT_EQ(ref, str) << F("ref: {}\nstr: {}", ref, str);                 \
 }
 
-#define ARRAYCONTAINERTEST(TYPE) \
-TEST_F(FmtsterTest, array_of_ ## TYPE ## s_to_JSON) \
+#define ARRAYCONTAINERTEST(TYPE)                                            \
+TEST_F(FmtsterTest, array_of_ ## TYPE ## s_to_JSON)                         \
 VALUECONTAINERTEST_INTERNAL((CreateContainer<array<TYPE, 3> >()))
 
-#define EMPTYARRAYCONTAINERTEST(TYPE) \
-TEST_F(FmtsterTest, empty_array_of_ ## TYPE ## s_to_JSON) \
+#define EMPTYARRAYCONTAINERTEST(TYPE)                                       \
+TEST_F(FmtsterTest, empty_array_of_ ## TYPE ## s_to_JSON)                   \
 VALUECONTAINERTEST_INTERNAL((array<TYPE, 0>{}))
 
-#define VALUECONTAINERTEST(CONT, TYPE) \
-TEST_F(FmtsterTest, CONT ## _of_ ## TYPE ## s_to_JSON) \
+#define VALUECONTAINERTEST(CONT, TYPE)                                      \
+TEST_F(FmtsterTest, CONT ## _of_ ## TYPE ## s_to_JSON)                      \
 VALUECONTAINERTEST_INTERNAL(CreateContainer<CONT<TYPE> >())
 
-#define EMPTYVALUECONTAINERTEST(CONT, TYPE) \
-TEST_F(FmtsterTest, empty_ ## CONT ## _of_ ## TYPE ## s_to_JSON) \
+#define EMPTYVALUECONTAINERTEST(CONT, TYPE)                                 \
+TEST_F(FmtsterTest, empty_ ## CONT ## _of_ ## TYPE ## s_to_JSON)            \
 VALUECONTAINERTEST_INTERNAL(CONT<TYPE>{})
 
-#define KEYVALUECONTAINERTEST(CONT, KEYTYPE, VALTYPE) \
+#define KEYVALUECONTAINERTEST(CONT, KEYTYPE, VALTYPE)                       \
 TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## s_to_JSON) \
 VALUECONTAINERTEST_INTERNAL((CreateContainer<CONT<KEYTYPE,VALTYPE> >()))
 
-#define ARRAYCONTAINERTESTS() \
-EMPTYARRAYCONTAINERTEST(string) \
-ARRAYCONTAINERTEST(string) \
-EMPTYARRAYCONTAINERTEST(int) \
-ARRAYCONTAINERTEST(int) \
-EMPTYARRAYCONTAINERTEST(float) \
-ARRAYCONTAINERTEST(float) \
-EMPTYARRAYCONTAINERTEST(bool) \
+#define ARRAYCONTAINERTESTS()                                               \
+EMPTYARRAYCONTAINERTEST(string)                                             \
+ARRAYCONTAINERTEST(string)                                                  \
+EMPTYARRAYCONTAINERTEST(int)                                                \
+ARRAYCONTAINERTEST(int)                                                     \
+EMPTYARRAYCONTAINERTEST(float)                                              \
+ARRAYCONTAINERTEST(float)                                                   \
+EMPTYARRAYCONTAINERTEST(bool)                                               \
 ARRAYCONTAINERTEST(bool)
 
-#define VALUECONTAINERTESTS(CONT) \
-EMPTYVALUECONTAINERTEST(CONT, string) \
-VALUECONTAINERTEST(CONT, string) \
-EMPTYVALUECONTAINERTEST(CONT, int) \
-VALUECONTAINERTEST(CONT, int) \
-EMPTYVALUECONTAINERTEST(CONT, float) \
-VALUECONTAINERTEST(CONT, float) \
-EMPTYVALUECONTAINERTEST(CONT, bool) \
+#define VALUECONTAINERTESTS(CONT)                                           \
+EMPTYVALUECONTAINERTEST(CONT, string)                                       \
+VALUECONTAINERTEST(CONT, string)                                            \
+EMPTYVALUECONTAINERTEST(CONT, int)                                          \
+VALUECONTAINERTEST(CONT, int)                                               \
+EMPTYVALUECONTAINERTEST(CONT, float)                                        \
+VALUECONTAINERTEST(CONT, float)                                             \
+EMPTYVALUECONTAINERTEST(CONT, bool)                                         \
 VALUECONTAINERTEST(CONT, bool)
 
-#define KEYVALUECONTAINERTESTS(CONT) \
-KEYVALUECONTAINERTEST(CONT, string, string) \
-KEYVALUECONTAINERTEST(CONT, string, int) \
-KEYVALUECONTAINERTEST(CONT, string, float) \
+#define KEYVALUECONTAINERTESTS(CONT)                                        \
+KEYVALUECONTAINERTEST(CONT, string, string)                                 \
+KEYVALUECONTAINERTEST(CONT, string, int)                                    \
+KEYVALUECONTAINERTEST(CONT, string, float)                                  \
 KEYVALUECONTAINERTEST(CONT, string, bool)
+
+// static_assert(sizeof(JSONStyle) == 2);
+// char (*__kaboom)[sizeof(JSONStyle)] = 1;
 
 /* test object */
 
@@ -367,6 +370,9 @@ class FmtsterTest : public ::testing::Test
 // some simple reference output (test does not fail)
 TEST_F(FmtsterTest, Reference)
 {
+fmtster::JSONStyle jsonStyle = fmtster::gDefaultJSONStyle;
+cout << F("{}", jsonStyle) << endl;
+
     float fSmall = 3.1415926535897932384626;
     float fLarge = 6.0234567e17;
     float fWhole = 2.000000000;
