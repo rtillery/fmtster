@@ -364,44 +364,69 @@ class FmtsterTest : public ::testing::Test
 
 /* tests */
 
-struct TEST
-{};
+// struct TEST
+// {};
+//
+// template<>
+// struct fmt::formatter<TEST>
+// {
+//     template<typename ParseContext>
+//     constexpr auto parse(ParseContext& ctx)
+//     {
+//         size_t braces = 1;
+//         auto itEnd = ctx.begin();
+//         for (; itEnd != ctx.end(); itEnd++)
+//         {
+//             if (*itEnd == '{')
+//                 braces++;
+//             else if (*itEnd == '}')
+//             {
+//                 if (!(--braces))
+//                     break;
+//             }
+//         }
+//         string str(ctx.begin(), itEnd);
+//         cout << "parse(): str: \"" << str << "\"" << endl;
+//         return itEnd;
+//     }
+//
+//     template<typename FormatContext>
+//     auto format(const TEST&, FormatContext& ctx)
+//     {
+//         return fmt::format_to(ctx.out(), "format().");
+//     }
+// };
+
+struct TEST2
+{
+
+};
 
 template<>
-struct fmt::formatter<TEST>
+struct fmt::formatter<TEST2>
 {
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-size_t braces = 1;
-auto itEnd = ctx.begin();
-for (; itEnd != ctx.end(); itEnd++)
-{
-    if (*itEnd == '{')
-        braces++;
-    else if (*itEnd == '}')
-    {
-        if (!(--braces))
-            break;
-    }
-}
-        string str(ctx.begin(), itEnd);
-        cout << "parse(): str: \"" << str << "\"" << endl;
-        return itEnd;
+        return find(ctx.begin(), ctx.end(), '}');
     }
 
     template<typename FormatContext>
-    auto format(const TEST&, FormatContext& ctx)
+    auto format(const TEST2&, FormatContext& ctx)
     {
-        return fmt::format_to(ctx.out(), "format().");
+        return fmt::format_to(ctx.out(), "30");
     }
 };
 
 // some simple reference output (test does not fail)
 TEST_F(FmtsterTest, Reference)
 {
-TEST t;
-cout << F("BEFORE>{:{}}<AFTER", t, 7) << endl;
+// TEST t;
+// cout << F("BEFORE>{:{}}<AFTER", t, 7) << endl;
+
+TEST2 t2;
+cout << F("t2: {}", t2) << endl;
+cout << F("-->{:<{}}<--", "left aligned" , t2) << endl;
 
     float fSmall = 3.1415926535897932384626;
     float fLarge = 6.0234567e17;
@@ -432,7 +457,7 @@ cout << F("BEFORE>{:{}}<AFTER", t, 7) << endl;
     cout << '\n' << endl;
 }
 
-#if 1
+#if 0
 
 // value container tests
 
