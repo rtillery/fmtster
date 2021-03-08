@@ -364,9 +364,45 @@ class FmtsterTest : public ::testing::Test
 
 /* tests */
 
+struct TEST
+{};
+
+template<>
+struct fmt::formatter<TEST>
+{
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
+    {
+size_t braces = 1;
+auto itEnd = ctx.begin();
+for (; itEnd != ctx.end(); itEnd++)
+{
+    if (*itEnd == '{')
+        braces++;
+    else if (*itEnd == '}')
+    {
+        if (!(--braces))
+            break;
+    }
+}
+        string str(ctx.begin(), itEnd);
+        cout << "parse(): str: \"" << str << "\"" << endl;
+        return itEnd;
+    }
+
+    template<typename FormatContext>
+    auto format(const TEST&, FormatContext& ctx)
+    {
+        return fmt::format_to(ctx.out(), "format().");
+    }
+};
+
 // some simple reference output (test does not fail)
 TEST_F(FmtsterTest, Reference)
 {
+TEST t;
+cout << F("BEFORE>{:{}}<AFTER", t, 7) << endl;
+
     float fSmall = 3.1415926535897932384626;
     float fLarge = 6.0234567e17;
     float fWhole = 2.000000000;
