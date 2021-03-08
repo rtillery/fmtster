@@ -397,26 +397,24 @@ class FmtsterTest : public ::testing::Test
 //     }
 // };
 
-struct TEST2
-{
-
-};
-
-template<>
-struct fmt::formatter<TEST2>
-{
-    template<typename ParseContext>
-    constexpr auto parse(ParseContext& ctx)
-    {
-        return find(ctx.begin(), ctx.end(), '}');
-    }
-
-    template<typename FormatContext>
-    auto format(const TEST2&, FormatContext& ctx)
-    {
-        return fmt::format_to(ctx.out(), "30");
-    }
-};
+// struct TEST2
+// {};
+//
+// template<>
+// struct fmt::formatter<TEST2>
+// {
+//     template<typename ParseContext>
+//     constexpr auto parse(ParseContext& ctx)
+//     {
+//         return find(ctx.begin(), ctx.end(), '}');
+//     }
+//
+//     template<typename FormatContext>
+//     auto format(const TEST2&, FormatContext& ctx)
+//     {
+//         return fmt::format_to(ctx.out(), "30");
+//     }
+// };
 
 // some simple reference output (test does not fail)
 TEST_F(FmtsterTest, Reference)
@@ -424,9 +422,12 @@ TEST_F(FmtsterTest, Reference)
 // TEST t;
 // cout << F("BEFORE>{:{}}<AFTER", t, 7) << endl;
 
-TEST2 t2;
-cout << F("t2: {}", t2) << endl;
-cout << F("-->{:<{}}<--", "left aligned" , t2) << endl;
+cout << F("-->{:<30}<--", "left aligned") << endl;
+// cout << F("-->{:<{}}<--", "left aligned" , 30) << endl;
+
+// TEST2 t2;
+// cout << F("t2: {}", t2) << endl;
+// cout << F("-->{:<{}}<--", "left aligned" , t2) << endl;
 
     float fSmall = 3.1415926535897932384626;
     float fLarge = 6.0234567e17;

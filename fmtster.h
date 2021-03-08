@@ -24,7 +24,8 @@
 #include <algorithm>
 #include <exception>
 #include <fmt/core.h>
-#include <fmt/format.h>
+// #include <fmt/format.h>
+#include "format.h"
 #include <regex>
 #include <string>
 #include <type_traits>
