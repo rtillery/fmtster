@@ -405,8 +405,10 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
     {
         using fmtster::F;
 
+using context = fmt::buffer_context<char>;
+
         std::string fmtStr;
-        if (fmt::formattable<T1>() && !std::is_same_v<std::string, T1>)
+        if (fmt::has_formatter<T1, context>() && !std::is_same_v<std::string, T1>)
         {
             fmtStr = F("{{:{},{},{},{}}} : ",
                        mFormatSetting,
@@ -419,7 +421,7 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
             fmtStr = F("{}{} : ", mIndent, formatString(v1));
         }
 
-        if (fmt::formattable<T2>() && !std::is_same_v<std::string, T2>)
+        if (fmt::has_formatter<T2, context>() && !std::is_same_v<std::string, T2>)
         {
             fmtStr += F("{{:{},{},{},{}}}",
                        mFormatSetting,
