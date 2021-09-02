@@ -73,6 +73,8 @@ using std::is_same_v;
 
 #include <utility>
 using std::declval;
+using std::pair;
+using std::make_pair;
 
 #include <gtest/gtest.h>
 
@@ -396,8 +398,6 @@ TEST_F(FmtsterTest, Reference)
     cout << '\n' << endl;
 }
 
-#if 1
-
 // value container tests
 
 ARRAYCONTAINERTESTS()
@@ -532,4 +532,18 @@ cout << str << endl;
     EXPECT_EQ(ref, str);
 }
 
-#endif // 0
+TEST_F(FmtsterTest, pairs)
+{
+    const string ref = "\"foo\" : \"bar\", \"foobar\" : 7";
+    string str = F("{}, {}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+}
+
+TEST_F(FmtsterTest, custom_indent_pairs)
+{
+    const string ref = "    \"fu\" : \"baz\", \"fubar\" : 3.14";
+    string str = F("{:,,4,1}, {}", make_pair("fu"s, "baz"s), make_pair("fubar"s, 3.14));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+}

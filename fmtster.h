@@ -57,9 +57,11 @@ namespace internal
 {
 
 template<typename>
-struct fmtster_true : true_type
+struct fmtster_true
+    : true_type
 {};
 
+// macro to create has_FN<> templates (also creates has_FN_v<> helper)
 #define fmtster_MAKEHASFN(FN)                                               \
 template<typename T, typename... Args>                                      \
 static auto test_ ## FN(int)                                                \
@@ -75,9 +77,11 @@ struct has_ ## FN : decltype(test_ ## FN<T, Args...>(0))                    \
 template<typename ...Ts>                                                    \
 inline constexpr bool has_ ## FN ## _v = has_ ## FN<Ts...>::value
 
+// macro to create has_TYPE<> templates (also creates has_TYPE_v<> helper)
 #define fmtster_MAKEHASTYPE(TYPE)                                           \
 template<typename T, typename = void>                                       \
-struct has_ ## TYPE : false_type                                            \
+struct has_ ## TYPE                                                         \
+    : false_type                                                            \
 {};                                                                         \
                                                                             \
 template<typename T>                                                        \
@@ -88,39 +92,48 @@ struct has_ ## TYPE<T, void_t<typename T::TYPE> >                           \
 template<typename ...Ts>                                                    \
 inline constexpr bool has_ ## TYPE ## _v = has_ ## TYPE<Ts...>::value
 
+// macro to create is_ID<> templates (also creates is_ID_v<> helper)
+//   COND provides the conditional value used to check traits
 #define fmtster_MAKEIS(ID, COND)                                            \
 template<typename T, typename = void>                                       \
-struct is_ ## ID : false_type                                               \
+struct is_ ## ID                                                            \
+    : false_type                                                            \
 {};                                                                         \
                                                                             \
 template<typename T>                                                        \
-struct is_ ## ID<T, enable_if_t<COND> > : true_type                         \
+struct is_ ## ID<T, enable_if_t<COND> >                                     \
+    : true_type                                                             \
 {};                                                                         \
                                                                             \
 template<typename ...Ts>                                                    \
 inline constexpr bool is_ ## ID ## _v = is_ ## ID<Ts...>::value
 
+// has_TYPE<> declarations
 fmtster_MAKEHASTYPE(const_iterator);
 fmtster_MAKEHASTYPE(key_type);
 fmtster_MAKEHASTYPE(mapped_type);
 fmtster_MAKEHASTYPE(container_type);
 
+// has_FN<> declarations
 fmtster_MAKEHASFN(begin);
 fmtster_MAKEHASFN(end);
 fmtster_MAKEHASFN(at);
-// fmtster_MAKEHASFN(operator[])
+// functional equivalent for fmtster_MAKEHASFN(operator[])
 template<typename T, typename U = void>
-struct has_operator_index : false_type
+struct has_operator_index
+    : false_type
 {};
 template<typename T>
 struct has_operator_index<T, void_t<decltype(declval<T&>()[declval<const typename T::key_type&>()])> >
     : true_type
 {};
 
+// is_ID<> declarations
 fmtster_MAKEIS(container, (conjunction_v<has_const_iterator<T>, has_begin<T>, has_end<T> >));
-// specialization for std::string, which is not considered a container
+// specialization for std::string, which is not considered a container by fmtster
 template<>
-struct is_container<string> : false_type
+struct is_container<string>
+    : false_type
 {};
 fmtster_MAKEIS(mappish, (conjunction_v<has_key_type<T>, has_mapped_type<T>, has_operator_index<T> >));
 fmtster_MAKEIS(multimappish, (conjunction_v<has_key_type<T>, has_mapped_type<T>, negation<has_at<T, typename T::key_type> > >));
@@ -128,26 +141,27 @@ fmtster_MAKEIS(adapter, has_container_type_v<T>);
 
 } // namespace internal
 
+// base class that handles formatting
 struct FmtsterBase
 {
-    int mFormatSetting = 0;
-    int mStyleSetting = 0;
-    int mTabSetting = 2;
-    int mIndentSetting = 0;
-    string mTab;
-    string mIndent;
+    int mFormatSetting = 0;     // format (0 = JSON)
+    int mStyleSetting = 0;      // style (0 = default)
+    int mTabSetting = 2;        // tab (0 = none, >0 = # of spaces, |<0| = # of tabs)
+    int mIndentSetting = 0;     // beginning number of indents
+    string mTab;                // expanded tab
+    string mIndent;             // expanded indent
 
     // Parses the format choice argument id in the format {<format>,<style>,<tab>,<indent>}.
-    // format (default is 0: JSON):
-    //   0 = JSON
-    //     style (default is 0):
-    //       0 = Google (https://google.github.io/styleguide/jsoncstyleguide.xml)
-    // tab (default is 2 spaces):
-    //   positive integers: spaces
-    //   0: no tab
-    //   negative integers: hard tabs
-    // indent (default is 0):
-    //   positive integers: number of <tab>s to start the indent
+    // > format (default is 0: JSON):
+    //     0 = JSON
+    // >     style (default is 0):
+    //         0 = Google (https://google.github.io/styleguide/jsoncstyleguide.xml)
+    // > tab (default is 2 spaces):
+    //     positive integers: spaces
+    //     0: no tab
+    //     negative integers: hard tabs
+    // > indent (default is 0):
+    //     positive integers: number of <tab>s to start the indent
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
@@ -190,9 +204,10 @@ struct FmtsterBase
                 throw fmt::format_error(F("invalid indent: \"{}\"", mIndentSetting));
         }
 
-        mTab = ((mTabSetting > 0)       ?
-              string(mTabSetting, ' ') :
-              string(-mTabSetting, '\t'));
+        mTab = (mTabSetting > 0)
+               ? string(mTabSetting, ' ')
+               : string(-mTabSetting, '\t');
+
         mIndent.clear();
         for (int i = 0; i < mIndentSetting; i++)
             mIndent += mTab;
@@ -200,17 +215,20 @@ struct FmtsterBase
         return itCtxEnd;
     }
 
+    // non-container types
     template<typename T>
     string appendFormatString(const T&, bool addComma)
     {
         return addComma ? "{},\n" : "{}\n";
     }
 
+    // add quotes to strings
     string appendFormatString(const string&, bool addComma)
     {
         return addComma ? "\"{}\",\n" : "\"{}\"\n";
     }
 
+    // create format string to be used by format_to() in child class format()
     template <typename T>
     string appendValueFormatString(const T& val, bool addComma)
     {
@@ -232,6 +250,7 @@ struct FmtsterBase
     }
 };
 
+// base class for mappish containers
 template<typename T>
 struct FmtsterMapBase : FmtsterBase
 {
@@ -361,5 +380,66 @@ struct fmt::formatter<A,
     auto format(const A& ac, FormatContext& ctx)
     {
         return fmt::format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
+    }
+};
+
+// pairs
+template<typename T1, typename T2>
+struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
+{
+    // integral types
+    template<typename T>
+    string formatString(const T&)
+    {
+        return "{}";
+    }
+
+    // add quotes to strings
+    string formatString(const string&)
+    {
+        return "\"{}\"";
+    }
+
+    // create format string to be used by format_to() in format()
+    string formatPairFormatString(const T1& v1, const T2& v2)
+    {
+        using fmtster::F;
+
+        string fmtStr;
+        if (fmt::formattable<T1>() && !std::is_same_v<string, T1>)
+        {
+            fmtStr = F("{{:{},{},{},{}}} : ",
+                       mFormatSetting,
+                       mStyleSetting,
+                       mTabSetting,
+                       mIndentSetting + 1);
+        }
+        else
+        {
+            fmtStr = F("{}{} : ", mIndent, formatString(v1));
+        }
+
+        if (fmt::formattable<T2>() && !std::is_same_v<string, T2>)
+        {
+            fmtStr += F("{{:{},{},{},{}}}",
+                       mFormatSetting,
+                       mStyleSetting,
+                       mTabSetting,
+                       mIndentSetting + 1);
+        }
+        else
+        {
+            fmtStr += formatString(v2);
+        }
+
+        return fmtStr;
+    }
+
+    template<typename FormatContext>
+    auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
+    {
+        return format_to(ctx.out(),
+                         formatPairFormatString(p.first, p.second),
+                         p.first, p.second);
     }
 };
