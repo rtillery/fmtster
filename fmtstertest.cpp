@@ -19,6 +19,13 @@
  * SOFTWARE.
  */
 
+#include "fmtster.h"
+using fmtster::F;
+using fmtster::internal::is_adapter_v;
+using fmtster::internal::is_mappish;
+using fmtster::internal::is_multimappish;
+using fmtster::internal::fmtster_true;
+
 #include <iostream>
 using std::cout;
 using std::endl;
@@ -77,13 +84,6 @@ using std::pair;
 using std::make_pair;
 
 #include <gtest/gtest.h>
-
-#include "fmtster.h"
-using fmtster::F;
-using fmtster::internal::is_adapter_v;
-using fmtster::internal::is_mappish;
-using fmtster::internal::is_multimappish;
-using fmtster::internal::fmtster_true;
 
 /* test data */
 template<typename T>

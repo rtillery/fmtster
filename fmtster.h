@@ -358,7 +358,7 @@ struct fmt::formatter<A,
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-        auto itCtxEnd = find(ctx.begin(), ctx.end(), '}');
+        auto itCtxEnd = std::find(ctx.begin(), ctx.end(), '}');
         mStrFmt = "{" + std::string(ctx.begin(), itCtxEnd) + "}";
         return itCtxEnd;
     }
@@ -389,24 +389,24 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
 {
     // integral types
     template<typename T>
-    string formatString(const T&)
+    std::string formatString(const T&)
     {
         return "{}";
     }
 
     // add quotes to strings
-    string formatString(const string&)
+    std::string formatString(const std::string&)
     {
         return "\"{}\"";
     }
 
     // create format string to be used by format_to() in format()
-    string formatPairFormatString(const T1& v1, const T2& v2)
+    std::string formatPairFormatString(const T1& v1, const T2& v2)
     {
         using fmtster::F;
 
-        string fmtStr;
-        if (fmt::formattable<T1>() && !std::is_same_v<string, T1>)
+        std::string fmtStr;
+        if (fmt::formattable<T1>() && !std::is_same_v<std::string, T1>)
         {
             fmtStr = F("{{:{},{},{},{}}} : ",
                        mFormatSetting,
@@ -419,7 +419,7 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
             fmtStr = F("{}{} : ", mIndent, formatString(v1));
         }
 
-        if (fmt::formattable<T2>() && !std::is_same_v<string, T2>)
+        if (fmt::formattable<T2>() && !std::is_same_v<std::string, T2>)
         {
             fmtStr += F("{{:{},{},{},{}}}",
                        mFormatSetting,
