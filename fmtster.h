@@ -21,6 +21,8 @@
  * SOFTWARE.
  */
 
+#define FMTSTER_VERSION 000200 // 0.2.0
+
 #include <algorithm>
 #include <exception>
 #include <fmt/core.h>
