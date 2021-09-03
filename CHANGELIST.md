@@ -1,8 +1,8 @@
-# **fmtster** Change List
-## 0.2.0
+# **`fmtster` Change List**
+## **0.2.0**
 * Added support for `std::pair<>`
 * *Known issues*
-  * Only tested with **{fmt}** version 8.0.1
+  * Only tested with **{fmt}** versions 7.0.3 & 8.0.1
   * Only ASCII char types supported
   * Only JSON serialization supported
     * C-style strings (`char*`) not propertly supported (not quoted)
@@ -10,11 +10,8 @@
     * No escape of characters in JSON strings
   * (See https://github.com/HarmanFOSS/fmtster/issues for more known issues)
 ---
----
-## 0.1.0
-
-**First release**
-
+## **0.1.0**
+*(Header contained no version.)*
 * Support for:
   * `std::array<>`
   * `std::vector<>`
