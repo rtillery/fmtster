@@ -21,14 +21,18 @@
 -->
 
 # **fmtster**
+
+## **Introduction**
+
 **`fmtster`** (format-ster) is designed to work with the
 [{fmt}](https://fmt.dev/latest/index.html) library. It provides
 `fmt::formatter` templates that allow
-[`std` C++ containers](https://en.cppreference.com/w/cpp/container) to be passed
-to the `fmt::format()` family of commands, and result in a `std::string`
-serialization of the contents.
+[`std` C++ containers](https://en.cppreference.com/w/cpp/container), including
+compound containers (containers within containers) to be passed to the
+`fmt::format()` family of commands, and result in a `std::string` serialization
+of the contents.
 
-An example of its use:
+The simplest example of its use:
 > ```
 > std::map<std::string, std::map<std::string, std::vector<std::string> > > mydata;
 > ...
@@ -57,83 +61,96 @@ and its (default) output:
 > }
 > ```
 
-`fmtster` is obviously useful for serialization, but it is also a useful
-debugging aid, allowing quick dumping of `std` C++ containers to a `std::string`
-for logging during development.<br>
 <br>
-***(In the future, it is intended that `fmtster` will be modfied to work with the
-C++20 `std::format` feature.)***
+
+***(Coming soon (hopefully), `fmtster` will be modfied to work with the C++20
+`std::format` feature.)***
+
+---
+
+## **Uses**
+
+Obviously `fmtster` is useful for **serialization**, but it is also useful for
+formatting a **debug log**, allowing quick dumping of `std` C++ containers
+during development.<br>
 
 ---
 <br>
 
-## **Options**
-In keeping with the design of {fmt}, `fmtster` provides the user optional style
-configuration specifiers. However, please note that the style format for
-`fmtster` differs from the {fmt} design, because the options being controlled
-are appropriate to container serialization. *Individual type formatting is not
-currently supported.*
+## **Formatting Options**
+As with {fmt}, `fmtster` provides the user optional formatting configuration
+settings. However, please note that the settings for `fmtster` differ from
+the {fmt} design, because the options being controlled are appropriate for
+container serialization.
+
+***NOTE**: Integral type formatting is not currently supported.*
+
+There are (currently) four parameters for setting the format style:
+* Serialization Format
+* Format Style
+* Tab Specification
+* Initial Indent
+
+All of these parameters are optional. If they are not provided, the default
+value is used. Some examples:
+> `fmt::format("{}", container);`<br>
+> The default values are used for all parameters.
+
+> `fmt::format("{:,1}", container);`<br>
+> The default values are used for all parameters except the second, which
+> is set to 1.
+
+> `fmt::format("{:,,4}", container);`<br>
+> The default values are used for all parameters except the third, which
+> is set to 4.
+
+> `fmt::format("{:,,,1}", container);`<br>
+> The default values are used for all parameters except the fourth, which
+> is set to 1.
+
+> `fmt::format("{:,1,,2}, container);`<br>
+> The default values are used for all parameters except the second and
+> fourth, which are set to values of 1 and 2, respectively.
 
 <br>
 
-### Serialization Format
+---
+<br>
 
-The first style value (after the colon, before the closing brace or a comma)
-indicates the serialization format. Following this (delimited by a
-comma), zero or more style-specific specifiers can be added, themselves
-separated by commas. Optional specifiers can be left empty and the default
-values will be used. (Commas can be omitted after the last specifier provided.)
+### **Serialization Format**
 
-**EXAMPLE**:
-
-> ```
-> fmt::format("    {1}: {0:,,4,1}", myvector, "myvector")
-> ```
-> This serializes a `std::vector<>` formatted as:
-> * JSON serialization format (the first field is empty, so the default serialization format is used)
-> * default JSON style (the second field is empty, so the default JSON style is
-> used)
-> * four space tabs (overriding the default of two spaces)
-> * indented by one tab unit (four spaces; the opening bracket may not be indented, depending on the second field)
->
-> Output will look something like this:
-> ```
->     myvector: [
->         "entry1",
->         "entry2"
->     ]
-> ```
+The first value (after the colon, before the closing brace or a comma)
+indicates the serialization format.
 
 The serialization formats supported and their associated specification values
 are:
 
 * **JSON**
   * 0
-  * json *(pending)*
-  * j *(pending)*
+  * json *(possible future alias)*
+  * j *(possible future alias)*
 
 * **XML** *(pending)*
+* etc.
 
-The JSON serialization format is the default.
-
----
 <br>
 
-## **Serialization Format Details**
+The ***default*** is 0 (JSON serialization format).
+
 <br>
 
 ### **JSON**
 The JSON format as specified at http://www.json.org
 <br>
-<br>
 
-#### **JSON Options**
 The JSON format specifier includes four optional fields, including the
 serialization format specifier itself:
 
 > `{:0,<style>,<tab>,<indent>}`<br>
-> `{:json,<style>,<tab>,<indent>}` *(pending)*<br>
-> `{:j,<style>,<tab>,<indent>}` *(pending)*<br>
+> `{:json,<style>,<tab>,<indent>}` *(possible future alias)*<br>
+> `{:j,<style>,<tab>,<indent>}` *(possible future alias)*<br>
+
+<br>
 
 **Style**
 
@@ -142,37 +159,39 @@ settings for multiple characteristics of the JSON output.<br>
 <br>
 The serialization format style allows user choices for things like the position
 of opening and closing braces and brackets, the spacing between punctuation and
-values, as well as exceptional choices like grouping short arrays on one line or
-placing single entry JSON object on one line, etc.<br>
-<br>
+values, as well as exceptional choices like grouping short or empty arrays on
+one line or placing single entry JSON objects on a single line, etc.<br>
 <br>
 **NOTE: The method of specifying the serialization format style is under
-consideration:**
+consideration.**
+<br>
 
-Some proposed methods for how this field might be specified are:
+At present, there is only one JSON style option supported. A value of 0 (the
+default) will cause the output to use the default layout (see examples), with
+braces or brackets (as appropriate for JSON) around the object. A value of 1
+will remove the brackets/braces. The initiial indent (see below) is used for
+the closing brace/bracket with a setting of 0 and is used for the data if set
+to 1. (The opening brace is not currently indented.)
 
->```
-> Bitfields:   {:0,6,<tab>,<indent>}
-> Tags:        {:j,spc-after-lead-brac|one-line-one-element-array,<tab>,<indent>}
-> Struct ptr:  {:0,0x123456789ABCDEF0,<tab>,<indent>}
-> ```
 <br>
 
 **Tab**
 
 The third field indicates the type and length of the tabs:
 
-* Positive values indicate the number of spaces per tab (e.g. 4 indicates a tab consisting of 4 spaces)
-* Negative values indicate the number of tab characters per tab (e.g. -2 indictes a tab consisting of 2 hard tab ('\t') chracters)
+* Positive values indicate the number of spaces per tab (e.g. 4 indicates a tab
+  consisting of 4 spaces)
+* Negative values indicate the number of tab characters per tab (e.g. -2
+  indictes a tab consisting of 2 hard tab ('\t') chracters)
 * 0 indicates no tabs
 
 <br>
 
 **Indent**
 
-The fourth field indicates the number of tab units used on all output lines.
-This is added to the tab used internally for formatting the serialization, so
-that the entire output is indented together.
+The fourth field indicates the starting number of tab units. This is added to
+the tab used internally for formatting the serialization, so that the entire
+output is indented together.
 
 **NOTE**: The indent specifier may be ignored when outputting the first line of
 a given container. This is due to the need to differentiate between tab levels
@@ -199,3 +218,11 @@ specification to override the default settings seems like a worthwhile addition.
 However, consideration of the side-effects, such as use of `fmtster` by multiple
 modules in the same process, will necessitate more consideration of an exact
 approach.*
+
+---
+<br>
+
+## **Examples**
+<br>
+
+See `example-json.cpp` for quick start to using `fmtster`.

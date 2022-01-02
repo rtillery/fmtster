@@ -23,7 +23,9 @@
 using fmtster::F;
 using fmtster::internal::is_adapter_v;
 using fmtster::internal::is_mappish;
+using fmtster::internal::is_mappish_v;
 using fmtster::internal::is_multimappish;
+using fmtster::internal::is_multimappish_v;
 using fmtster::internal::fmtster_true;
 
 #include <iostream>
@@ -72,7 +74,9 @@ using std::make_tuple;
 #include <type_traits>
 using std::true_type;
 using std::false_type;
+using std::conjunction;
 using std::conjunction_v;
+using std::disjunction;
 using std::disjunction_v;
 using std::negation;
 using std::enable_if_t;
@@ -152,6 +156,7 @@ fmtster_MAKEHASFN(push_back);
 fmtster_MAKEHASFN(push_front);
 fmtster_MAKEHASFN(size);
 fmtster_MAKEHASFN(begin);
+fmtster_MAKEHASFN(hash_function);
 
 fmtster_MAKEIS(keyval_container, (disjunction_v<is_mappish<T>, is_multimappish<T> >));
 
@@ -162,7 +167,7 @@ fmtster_MAKEIS(keyval_container, (disjunction_v<is_mappish<T>, is_multimappish<T
 
 template<typename C>
 enable_if_t<conjunction_v<has_push_back<C, typename C::value_type>,
-                          negation<is_keyval_container<C> > >,
+                          negation<is_mappish<C> > >,
             C> CreateContainer()
 {
     C cData;
@@ -216,7 +221,16 @@ enable_if_t<is_array_v<C>, C> CreateContainer()
 }
 
 template<typename C>
-enable_if_t<is_keyval_container_v<C>, C> CreateContainer()
+enable_if_t<is_mappish_v<C>, C> CreateContainer()
+{
+    C cData;
+    for (auto& [key, val] : GetKeyValueContainerData<typename C::key_type, typename C::mapped_type>())
+        cData.emplace(key, val);
+    return cData;
+}
+
+template<typename C>
+enable_if_t<is_multimappish_v<C>, C> CreateContainer()
 {
     C cData;
     for (auto& [key, val] : GetKeyValueContainerData<typename C::key_type, typename C::mapped_type>())
@@ -226,32 +240,36 @@ enable_if_t<is_keyval_container_v<C>, C> CreateContainer()
 
 /* reference creation templates */
 
+// some single item element containers have a size member
 template<typename C>
 enable_if_t<conjunction_v<has_size<C>,
                           has_begin<C>,
                           negation<is_keyval_container<C> > >,
                  string> GetReference(const C& data)
 {
-    const string strFmt(std::is_same_v<typename C::value_type, string> ?
-                        "  \"{}\"{}\n" :
-                        "  {}{}\n");
-    string ref("[\n");
+    const string strFmt(is_same_v<typename C::value_type, string> ?
+                        "\n  \"{}\"{}" :
+                        "\n  {}{}");
+    string ref(data.empty() ? "[ " : "[");
     auto len = data.size();
     for (auto e : data)
         ref += F(strFmt, e, --len ? "," : "");
+    if (!data.empty())
+        ref += "\n";
     ref += "]";
     return ref;
 }
 
+// some single item element containers have no size member
 template<typename C>
 enable_if_t<conjunction_v<negation<has_size<C> >,
                           negation<is_keyval_container<C> > >,
                  string> GetReference(const C& data)
 {
     const string strFmt(is_same_v<typename C::value_type, string>
-                        ? "  \"{}\"{}\n"
-                        : "  {}{}\n");
-    string ref("[\n");
+                        ? "\n  \"{}\"{}"
+                        : "\n  {}{}");
+    string ref(data.empty() ? "[ " : "[");
     auto it = data.begin();
     while (it != data.end())
     {
@@ -259,6 +277,8 @@ enable_if_t<conjunction_v<negation<has_size<C> >,
         it++;
         ref += F(strFmt, *itThis, (it != data.end()) ? "," : "");
     }
+    if (!data.empty())
+        ref += "\n";
     ref += "]";
     return ref;
 }
@@ -266,18 +286,142 @@ enable_if_t<conjunction_v<negation<has_size<C> >,
 template<typename C>
 enable_if_t<conjunction_v<has_size<C>,
                           has_begin<C>,
-                          is_keyval_container<C> >,
+                          is_mappish<C> >,
                  string> GetReference(const C& data)
 {
     const string strFmt(is_same_v<typename C::mapped_type, string>
-                        ? "  \"{}\": \"{}\"{}\n"
-                        : "  \"{}\": {}{}\n");
-    string ref("{\n");
+                        ? "\n  \"{}\" : \"{}\"{}"
+                        : "\n  \"{}\" : {}{}");
+    string ref(data.empty() ? "{ " : "{");
     auto len = data.size();
     for (auto [key, val] : data)
         ref += F(strFmt, key, val, --len ? "," : "");
+    if (!data.empty())
+        ref += "\n";
     ref += "}";
     return ref;
+}
+
+template<typename C>
+enable_if_t<conjunction_v<has_size<C>,
+                          has_begin<C>,
+                          is_multimappish<C> >,
+            string> GetReference(const C& data)
+{
+    using mapped_type = typename C::mapped_type;
+
+    if (is_same_v<mapped_type, string>)
+    {
+        if (has_hash_function_v<C>)
+            return
+                "{\n  \"key3\" : [\n"
+                "    \"value3\"\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    \"value2\"\n"
+                "  ],\n"
+                "  \"key1\" : [\n"
+                "    \"value1\"\n"
+                "  ]\n"
+                "}";
+        else
+            return
+                "{\n  \"key1\" : [\n"
+                "    \"value1\"\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    \"value2\"\n"
+                "  ],\n"
+                "  \"key3\" : [\n"
+                "    \"value3\"\n"
+                "  ]\n"
+                "}";
+    }
+    else if (is_same_v<mapped_type, bool>)
+    {
+        if (has_hash_function_v<C>)
+            return
+                "{\n"
+                "  \"key3\" : [\n"
+                "    false\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    true\n  ],\n"
+                "  \"key1\" : [\n"
+                "    false\n"
+                "  ]\n"
+                "}";
+        else
+            return
+                "{\n"
+                "  \"key1\" : [\n"
+                "    false\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    true\n  ],\n"
+                "  \"key3\" : [\n"
+                "    false\n"
+                "  ]\n"
+                "}";
+    }
+    else if (is_same_v<mapped_type, int>)
+    {
+        if (has_hash_function_v<C>)
+            return
+                "{\n"
+                "  \"key3\" : [\n"
+                "    3\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    2\n"
+                "  ],\n"
+                "  \"key1\" : [\n"
+                "    1\n"
+                "  ]\n"
+                "}";
+        else
+            return
+                "{\n"
+                "  \"key1\" : [\n"
+                "    1\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    2\n"
+                "  ],\n"
+                "  \"key3\" : [\n"
+                "    3\n"
+                "  ]\n"
+                "}";
+    }
+    else if (is_same_v<mapped_type, float> || is_same_v<mapped_type, double>)
+    {
+        if (has_hash_function_v<C>)
+            return
+                "{\n"
+                "  \"key3\" : [\n"
+                "    3.3\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    2.2\n"
+                "  ],\n"
+                "  \"key1\" : [\n"
+                "    1.1\n"
+                "  ]\n"
+                "}";
+        else
+            return
+                "{\n"
+                "  \"key1\" : [\n"
+                "    1.1\n"
+                "  ],\n"
+                "  \"key2\" : [\n"
+                "    2.2\n"
+                "  ],\n"
+                "  \"key3\" : [\n"
+                "    3.3\n"
+                "  ]\n"
+                "}";
+    }
 }
 
 template <class ADAPTER>
@@ -329,7 +473,7 @@ TEST_F(FmtsterTest, empty_ ## CONT ## _of_ ## TYPE ## s_to_JSON) \
 VALUECONTAINERTEST_INTERNAL(CONT<TYPE>{})
 
 #define KEYVALUECONTAINERTEST(CONT, KEYTYPE, VALTYPE) \
-TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s__to_ ## VALTYPE ## s_to_JSON) \
+TEST_F(FmtsterTest, CONT ## _of_ ## KEYTYPE ## s_to_ ## VALTYPE ## s_to_JSON) \
 VALUECONTAINERTEST_INTERNAL((CreateContainer<CONT<KEYTYPE,VALTYPE> >()))
 
 #define ARRAYCONTAINERTESTS() \
@@ -448,13 +592,13 @@ TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON)
     };
     const string ref =
         "{\n"
-        "  \"map1\": {\n"
-        "    \"entry1\": \"value1\",\n"
-        "    \"entry2\": \"value2\"\n"
+        "  \"map1\" : {\n"
+        "    \"entry1\" : \"value1\",\n"
+        "    \"entry2\" : \"value2\"\n"
         "  },\n"
-        "  \"map2\": {\n"
-        "    \"entry3\": \"value3\",\n"
-        "    \"entry4\": \"value4\"\n"
+        "  \"map2\" : {\n"
+        "    \"entry3\" : \"value3\",\n"
+        "    \"entry4\" : \"value4\"\n"
         "  }\n"
         "}";
     string str = F("{}", mapofmapofstrings);
@@ -483,13 +627,13 @@ TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON_4SpaceTab)
     };
     const string ref =
         "{\n"
-        "    \"map1\": {\n"
-        "        \"entry1\": \"value1\",\n"
-        "        \"entry2\": \"value2\"\n"
+        "    \"map1\" : {\n"
+        "        \"entry1\" : \"value1\",\n"
+        "        \"entry2\" : \"value2\"\n"
         "    },\n"
-        "    \"map2\": {\n"
-        "        \"entry3\": \"value3\",\n"
-        "        \"entry4\": \"value4\"\n"
+        "    \"map2\" : {\n"
+        "        \"entry3\" : \"value3\",\n"
+        "        \"entry4\" : \"value4\"\n"
         "    }\n"
         "}";
     string str = F("{:,,4}", mapofmapofstrings);
@@ -518,11 +662,11 @@ TEST_F(FmtsterTest, map_of_vectors_of_strings_to_JSON)
     };
     const string ref =
         "{\n"
-        "  \"vec1\": [\n"
+        "  \"vec1\" : [\n"
         "    \"vec1val1\",\n"
         "    \"vec1val2\"\n"
         "  ],\n"
-        "  \"vec2\": [\n"
+        "  \"vec2\" : [\n"
         "    \"vec2val1\",\n"
         "    \"vec2val2\"\n"
         "  ]\n"
@@ -534,8 +678,23 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, pairs)
 {
-    const string ref = "\"foo\" : \"bar\", \"foobar\" : 7";
+    string ref = "{\n  \"foo\" : \"bar\"\n}, {\n  \"foobar\" : 7\n}";
     string str = F("{}, {}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    ref = "\"foo\" : \"bar\", \"foobar\" : 7";
+    str = F("{:,1}, {:,1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    ref = "{\n    \"foo\" : \"bar\"\n  }, {\n    \"foobar\" : 7\n  }";
+    str = F("{:,,,1}, {:,,,1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    ref = "  \"foo\" : \"bar\", \"foobar\" : 7";
+    str = F("{:,1,,1}, {:,1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -543,7 +702,197 @@ cout << str << endl;
 TEST_F(FmtsterTest, custom_indent_pairs)
 {
     const string ref = "    \"fu\" : \"baz\", \"fubar\" : 3.14";
-    string str = F("{:,,4,1}, {}", make_pair("fu"s, "baz"s), make_pair("fubar"s, 3.14));
+    string str = F("{:,1,4,1}, {:,1}", make_pair("fu"s, "baz"s), make_pair("fubar"s, 3.14));
 cout << str << endl;
     EXPECT_EQ(ref, str);
+}
+
+TEST_F(FmtsterTest, NestedPairs)
+{
+    string ref =
+        "\"foo\" : {\n"
+        "    \"bar\" : \"baz\"\n"
+        "}";
+    string str = F("{:,1,4}", make_pair("foo"s, make_pair("bar"s, "baz"s)));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    ref =
+        "    \"foo\" : {\n"
+        "        \"bar\" : \"baz\"\n"
+        "    }";
+    str = F("{:,1,4,1}", make_pair("foo"s, make_pair("bar"s, "baz"s)));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    map<string, vector<string> > mapofvectorofstrings =
+    {
+        {
+            "vec1",
+            {
+                "vec1val1",
+                "vec1val2"
+            }
+        },
+        {
+            "vec2",
+            {
+                "vec2val1",
+                "vec2val2"
+            }
+        }
+    };
+
+    ref =
+        "\"foo\" : {\n"
+        "    \"bar\" : {\n"
+        "        \"vec1\" : [\n"
+        "            \"vec1val1\",\n"
+        "            \"vec1val2\"\n"
+        "        ],\n"
+        "        \"vec2\" : [\n"
+        "            \"vec2val1\",\n"
+        "            \"vec2val2\"\n"
+        "        ]\n"
+        "    }\n"
+        "}";
+    str = F("{:,1,4}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    ref =
+    "    \"foo\" : {\n"
+    "        \"bar\" : {\n"
+    "            \"vec1\" : [\n"
+    "                \"vec1val1\",\n"
+    "                \"vec1val2\"\n"
+    "            ],\n"
+    "            \"vec2\" : [\n"
+    "                \"vec2val1\",\n"
+    "                \"vec2val2\"\n"
+    "            ]\n"
+    "        }\n"
+    "    }";
+    str = F("{:,1,4,1}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)));
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+}
+
+TEST_F(FmtsterTest, EscapedValues)
+{
+    map<string, vector<string> > mapofvectorofstrings =
+    {
+        {
+            R"(vec\1)",
+            {
+                R"(\vec"1/\val/1)",
+                "vec\b1\x7Fval\n2" R"(\)"
+            }
+        },
+        {
+            "vec\xA5" "2",  // Two tricks to insert ¥ char (ASCII 0xA5/165):
+                            // 1. Char itself is converted to unicode (at least
+                            //    by my editor), so hex escape used.
+                            // 2. \xA52 is misinterpreted by gcc as three digit
+                            //    value, even though only two digits should be
+                            //    read for \x prefix:
+                            //    https://en.cppreference.com/w/cpp/language/escape
+            {
+                R"(vec"2'val)" "\t1",
+                "vec\f2\tval\r2"
+            }
+        }
+    };
+    const string ref =
+        "{\n"
+        R"(  "vec\\1" : [)" "\n"
+        R"(    "\\vec\"1\/\\val\/1",)" "\n"
+        R"(    "vec\b1\u007Fval\n2\\")" "\n"
+        "  ],\n"
+        R"(  "vec\u00A52" : [)" "\n"
+        R"(    "vec\"2'val\t1",)" "\n"
+        R"(    "vec\f2\tval\r2")" "\n"
+        "  ]\n"
+        "}";
+    string str = F("{}", mapofvectorofstrings);
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+}
+
+TEST_F(FmtsterTest, Tuple)
+{
+    const auto tup = make_tuple(
+        make_pair("int"s, 25),
+        make_pair("string"s, "Hello"s),
+        make_pair("float"s, 9.31f),
+        make_pair("vector"s, vector<int>{3, 1, 4}),
+        make_pair("boolean"s, true));
+    string str = F("{:,1,4,1}", tup);
+    string ref =
+        R"(    "int" : 25,)" "\n"
+        R"(    "string" : "Hello",)" "\n"
+        R"(    "float" : 9.31,)" "\n"
+        R"(    "vector" : [)" "\n"
+        "        3,\n"
+        "        1,\n"
+        "        4\n"
+        "    ],\n"
+        R"(    "boolean" : true)";
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+
+    str = F("{:,,4,1}", tup);
+    ref =
+        "{\n"
+        R"(        "int" : 25,)" "\n"
+        R"(        "string" : "Hello",)" "\n"
+        R"(        "float" : 9.31,)" "\n"
+        R"(        "vector" : [)" "\n"
+        "            3,\n"
+        "            1,\n"
+        "            4\n"
+        "        ],\n"
+        R"(        "boolean" : true)" "\n"
+        "    }";
+cout << str << endl;
+    EXPECT_EQ(ref, str);
+}
+
+TEST_F(FmtsterTest, Layers)
+{
+    // pair
+    auto pr = make_pair("key"s, "value"s);
+    string str = F("{}", pr);
+    EXPECT_EQ("{\n  \"key\" : \"value\"\n}"s, str);
+    str = F("{:,1}", pr);
+    EXPECT_EQ("\"key\" : \"value\""s, str);
+    str = F("{:,,,1}", pr);
+    EXPECT_EQ("{\n    \"key\" : \"value\"\n  }"s, str);
+    str = F("{:,1,,1}", pr);
+    EXPECT_EQ("  \"key\" : \"value\""s, str);
+    // tuple
+    auto tup = make_tuple("string"s, 1, true, 3.14);
+    str = F("{}", tup);
+    EXPECT_EQ("{\n  \"string\",\n  1,\n  true,\n  3.14\n}"s, str);
+    str = F("{:,1}", tup);
+    EXPECT_EQ("\"string\",\n1,\ntrue,\n3.14"s, str);
+    str = F("{:,,,1}", tup);
+    EXPECT_EQ("{\n    \"string\",\n    1,\n    true,\n    3.14\n  }"s, str);
+    str = F("{:,1,,1}", tup);
+    EXPECT_EQ("  \"string\",\n  1,\n  true,\n  3.14"s, str);
+    auto mm2 = multimap<string, map<string, int> >{ { "mm1"s, { { "one"s, 1 }, { "two"s, 2 }, { "three"s, 3 } } },
+                                                    { "mm2"s, { { "four"s, 4 }, { "five"s, 5 } } },
+                                                    { "mm1"s, { { "six"s, 6 }, { "seven"s, 7 } } } };
+    str = F("{}", mm2);
+    EXPECT_EQ("{\n  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]\n}"s,
+              str);
+    str = F("{:,1}", mm2);
+    EXPECT_EQ("\"mm1\" : [\n  {\n    \"seven\" : 7,\n    \"six\" : 6\n  },\n  {\n    \"one\" : 1,\n    \"three\" : 3,\n    \"two\" : 2\n  }\n],\n\"mm2\" : [\n  {\n    \"five\" : 5,\n    \"four\" : 4\n  }\n]"s,
+              str);
+    str = F("{:,,,1}", mm2);
+    EXPECT_EQ("{\n    \"mm1\" : [\n      {\n        \"seven\" : 7,\n        \"six\" : 6\n      },\n      {\n        \"one\" : 1,\n        \"three\" : 3,\n        \"two\" : 2\n      }\n    ],\n    \"mm2\" : [\n      {\n        \"five\" : 5,\n        \"four\" : 4\n      }\n    ]\n  }"s,
+              str);
+    str = F("{:,1,,1}", mm2);
+    EXPECT_EQ("  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]"s,
+              str);
 }
