@@ -232,18 +232,27 @@ void ForEachElement(const std::tuple<Ts...>& tup, F fn)
 
 } // namespace internal
 
+// JSON style structure for re-use
+struct JSONStyle
+{
+    int formatSetting = 0;     // format (0 = JSON)
+    int tabSetting = 2;        // tab (0: none, >0: # of spaces, |<0|: # of tabs)
+
+    string tab = "  ";         // expanded tab
+};
+
 // base class that handles formatting
 struct FmtsterBase
 {
-    int mFormatSetting = 0;     // format (0 = JSON)
-    int mStyleSetting = 0;      // style (0 = default, 1 = no brackets/braces)
-    int mTabSetting = 2;        // tab (0: none, >0: # of spaces, |<0|: # of tabs)
-    int mBraIndentSetting = 0;  // beginning number of brace/bracket indents
-    int mDataIndentSetting = 1; // beginning number of data indents
+    static fmtster::JSONStyle sStyle;
 
-    string mTab;                // expanded tab
-    string mBraIndent;          // expanded brace/bracket indent
-    string mDataIndent;         // expanded data indent
+    int braIndentSetting = 0;  // beginning number of brace/bracket indents
+    int dataIndentSetting = 1; // beginning number of data indents
+
+    bool disableBraces = false;
+
+    string braIndent = "";     // expanded brace/bracket indent
+    string dataIndent = "  ";  // expanded data indent
 
     template<typename T>
     T escapeValue(const T& val)
@@ -310,54 +319,52 @@ struct FmtsterBase
         std::smatch sm;
         std::regex_search(strFmt, sm, rx);
 
-        auto smFormat = sm[1].str();
-        if (!smFormat.empty())
+        auto strFormat = sm[1].str();
+        if (!strFormat.empty())
         {
-            mFormatSetting = stoi(smFormat);
-            if (mFormatSetting != 0)
+            sStyle.formatSetting = stoi(strFormat);
+            if (sStyle.formatSetting != 0)
                 throw fmt::format_error(fmt::format("unsupported output format: \"{}\"",
-                                                    smFormat));
+                                                    strFormat));
         }
 
-        auto smStyle = sm[2].str();
-        if (!smStyle.empty())
-        {
-            mStyleSetting = stoi(smStyle);
-            if ((mStyleSetting != 0) && (mStyleSetting != 1))
-                throw fmt::format_error(fmt::format("invalid style (\"{}\") for format \"{}\"",
-                                                    mStyleSetting,
-                                                    mFormatSetting));
-        }
+auto strStyle = sm[2].str();
+disableBraces = !strStyle.empty() && (stoi(strStyle) & 1);
 
-        auto smTab = sm[3].str();
-        if (!smTab.empty())
+        auto strTab = sm[3].str();
+        if (!strTab.empty())
         {
-            mTabSetting = stoi(smTab);
+            sStyle.tabSetting = stoi(strTab);
         }
+else
+    sStyle.tabSetting = 2;
 
-        auto smIndent = sm[4].str();
-        if (!smIndent.empty())
+        auto strIndent = sm[4].str();
+        if (!strIndent.empty())
         {
-            mBraIndentSetting = stoi(smIndent);
-            if (mBraIndentSetting < 0)
+            braIndentSetting = stoi(strIndent);
+            if (braIndentSetting < 0)
                 throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
-                                        mBraIndentSetting));
+                                        braIndentSetting));
         }
+else
+    braIndentSetting = 0;
 
-        mTab = (mTabSetting > 0)
-               ? string(mTabSetting, ' ')
-               : string(-mTabSetting, '\t');
+        sStyle.tab = (sStyle.tabSetting > 0)
+                     ? string(sStyle.tabSetting, ' ')
+                     : string(-sStyle.tabSetting, '\t');
 
-        for (int i = 0; i < mBraIndentSetting; i++)
-            mBraIndent += mTab;
+        braIndent.clear();
+        for (int i = 0; i < braIndentSetting; i++)
+            braIndent += sStyle.tab;
 
-        mDataIndentSetting = mBraIndentSetting;
-        mDataIndent = mBraIndent;
+        dataIndentSetting = braIndentSetting;
+        dataIndent = braIndent;
 
-        if (!(mStyleSetting & 1))
+        if (!disableBraces)
         {
-            mDataIndentSetting++;
-            mDataIndent += mTab;
+            dataIndentSetting++;
+            dataIndent += sStyle.tab;
         }
 
         return itCtxEnd;
@@ -383,6 +390,7 @@ struct FmtsterBase
         return indent + (addComma ? "\"{}\"," : "\"{}\"");
     }
 
+    // templated function to provide container (supported by fmster) {fmt} string
     template<typename T>
     std::enable_if_t<internal::is_fmtsterable_v<T>, std::string>
         createFormatString(const T&,
@@ -391,13 +399,15 @@ struct FmtsterBase
                            bool addComma)
     {
         return fmt::format("{{:{},{},{},{}}}{}",
-                           mFormatSetting,
-                           !addBraces ? (mStyleSetting | 1) : (mStyleSetting & ~1),
-                           mTabSetting,
-                           mDataIndentSetting,
+                           sStyle.formatSetting,
+!addBraces ? 1 : 0,
+                           sStyle.tabSetting,
+                           dataIndentSetting,
                            addComma ? "," : "");
     }
 }; // struct FmtterBase
+
+extern JSONStyle FmtsterBase::sStyle;
 
 } // namespace fmtster
 
@@ -422,13 +432,13 @@ struct fmt::formatter<T,
         while (itC != c.end())
         {
             std::string fmtStr;
-            if (!(mStyleSetting & 1) || (itC != c.begin()))
+            if (!disableBraces || (itC != c.begin()))
                 fmtStr = "\n";
 
             const auto& val = *itC;
 
             if (!is_braceable_v<C>)
-                fmtStr += mDataIndent;
+                fmtStr += dataIndent;
 
             itC++;
 
@@ -454,11 +464,11 @@ struct fmt::formatter<T,
             while (it != c.end())
             {
                 std::string fmtStr;
-                if ((!mStyleSetting & 1) || (it != c.begin()))
+                if (!disableBraces || (it != c.begin()))
                     fmtStr = "\n";
 
                 const auto& key = it->first;
-                fmtStr += createFormatString(key, mDataIndent, false, false);
+                fmtStr += createFormatString(key, dataIndent, false, false);
                 fmtStr += " : ";
                 itOut = fmt::format_to(itOut, fmtStr, escapeValue(key));
 
@@ -482,26 +492,26 @@ struct fmt::formatter<T,
         using namespace fmtster::internal;
 
         // output opening bracket/brace (if enabled)
-        auto itOut = (mStyleSetting & 1) ?
+        auto itOut = disableBraces ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), is_braceable_v<T> ? "{{" : "[");
 
         const bool empty = (sc.end() == sc.begin());
 
-        if (empty && !(mStyleSetting & 1))
+        if (empty && !disableBraces)
             itOut = fmt::format_to(itOut, " ");
         else
             format_loop<FormatContext, T>(sc, itOut);
 
         // output closing brace
-        if (!(mStyleSetting & 1))
+        if (!disableBraces)
         {
             if (empty)
                 itOut = fmt::format_to(itOut, is_braceable_v<T> ? "}}" : "]");
             else
                 itOut = fmt::format_to(itOut,
                                        is_braceable_v<T> ? "\n{}}}" : "\n{}]",
-                                       mBraIndent);
+                                       braIndent);
         }
 
         return itOut;
@@ -554,15 +564,15 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
     {
         std::string fmtStr;
 
-        if (!(mStyleSetting & 1))
+        if (!disableBraces)
             fmtStr += "{{\n";
 
-        fmtStr += createFormatString(v1, mDataIndent, false, false);
+        fmtStr += createFormatString(v1, dataIndent, false, false);
         fmtStr += " : ";
         fmtStr += createFormatString(v2, "", true, false);
 
-        if (!(mStyleSetting & 1))
-            fmtStr += fmt::format("\n{}}}}}", mBraIndent);
+        if (!disableBraces)
+            fmtStr += fmt::format("\n{}}}}}", braIndent);
 
         return fmtStr;
     } // createPairFormatString()
@@ -586,13 +596,13 @@ struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
         using namespace fmtster::internal;
 
         // output opening bracket (if enabled)
-        auto itOut = (mStyleSetting & 1) ?
+        auto itOut = disableBraces ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), "{{");
         auto count = sizeof...(Ts);
 
         const bool empty = !count;
-        if (empty && !(mStyleSetting & 1))
+        if (empty && !disableBraces)
         {
             itOut = fmt::format_to(itOut, " ");
         }
@@ -602,24 +612,23 @@ struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
                            [&](const auto& elem)
                            {
                                std::string fmtStr;
-                               if (!(mStyleSetting & 1)
-                                   || (count != sizeof...(Ts)))
+                               if (!disableBraces || (count != sizeof...(Ts)))
                                    fmtStr = "\n";
 
                                fmtStr += createFormatString(elem,
-                                                            mDataIndent,
+                                                            dataIndent,
                                                             false,
                                                             --count);
                                itOut = fmt::format_to(itOut, fmtStr, elem);
                            });
 
             // output closing brace
-            if (!(mStyleSetting & 1))
+            if (!disableBraces)
             {
                 if (empty)
                     itOut = fmt::format_to(itOut, "}");
                 else
-                    itOut = fmt::format_to(itOut, "\n{}}}", mBraIndent);
+                    itOut = fmt::format_to(itOut, "\n{}}}", braIndent);
             }
         }
 

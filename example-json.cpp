@@ -77,13 +77,13 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         //  main(), but this to illustrates use of the fmt::format_to() call
         //  and care that needs to be taken with JSON commas
 
-        auto itOut = (mStyleSetting & 1) ?
+        auto itOut = disableBraces ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), "{{\n");
 
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
                                         mFormatSetting,
-                                        mStyleSetting | 1,
+1,
                                         mTabSetting,
                                         mDataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
@@ -100,7 +100,7 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         itOut = format_to(itOut, FMTSTR, mp("phones"s, p.phones));
         itOut = format_to(itOut, FMTSTR_NOCOMMA, mp("family"s, p.family));
 
-        if (!(mStyleSetting & 1))
+        if (!disableBraces)
             itOut = fmt::format_to(itOut, "\n}}");
 
         return itOut;
