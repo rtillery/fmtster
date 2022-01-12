@@ -1,4 +1,13 @@
 # **`fmtster` Change List**
+## **0.3.0**
+* Fixed issues with `std::pair<>`
+* Added support for `std::tuple<>` (currently only meant to hold `std::pair<>`s
+  with the first elements being `std::string`s; the second elements can differ,
+  providing heterogeneous object support)
+* Added JSON string escaping
+* Added support for JSON style setting (second format field) of 1 (in addition
+  to 0) to remove surrounding brackets/brackets
+* Added example-json.cpp
 ## **0.2.0**
 * Added support for `std::pair<>`
 * *Known issues*
