@@ -236,8 +236,6 @@ void ForEachElement(const std::tuple<Ts...>& tup, F fn)
 struct JSONStyle
 {
     int formatSetting = 0;     // format (0 = JSON)
-    int tabSetting = 2;        // tab (0: none, >0: # of spaces, |<0|: # of tabs)
-
     string tab = "  ";         // expanded tab
 };
 
@@ -331,13 +329,16 @@ struct FmtsterBase
 auto strStyle = sm[2].str();
 disableBraces = !strStyle.empty() && (stoi(strStyle) & 1);
 
-        auto strTab = sm[3].str();
-        if (!strTab.empty())
-        {
-            sStyle.tabSetting = stoi(strTab);
-        }
-else
-    sStyle.tabSetting = 2;
+auto strTab = sm[3].str();
+int tabSetting = 2;
+if (!strTab.empty())
+{
+    tabSetting = stoi(strTab);
+}
+
+sStyle.tab = (tabSetting > 0)
+             ? string(tabSetting, ' ')
+             : string(-tabSetting, '\t');
 
         auto strIndent = sm[4].str();
         if (!strIndent.empty())
@@ -349,10 +350,6 @@ else
         }
 else
     braIndentSetting = 0;
-
-        sStyle.tab = (sStyle.tabSetting > 0)
-                     ? string(sStyle.tabSetting, ' ')
-                     : string(-sStyle.tabSetting, '\t');
 
         braIndent.clear();
         for (int i = 0; i < braIndentSetting; i++)
@@ -401,7 +398,7 @@ else
         return fmt::format("{{:{},{},{},{}}}{}",
                            sStyle.formatSetting,
 !addBraces ? 1 : 0,
-                           sStyle.tabSetting,
+sStyle.tab.size(),
                            dataIndentSetting,
                            addComma ? "," : "");
     }
@@ -635,3 +632,60 @@ struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
         return itOut;
     }
 }; // struct fmt::formatter<std::tuple<> >
+
+// fmt::formatter<> for fmtster::JSONStyle
+template<>
+struct fmt::formatter<fmtster::JSONStyle>
+    : fmtster::FmtsterBase
+{
+    bool dump = false;
+
+    template<typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
+    {
+        auto it = ctx.begin();
+        if (it != ctx.end())
+        {
+            const auto c = *it;
+            if (c != '}')
+            {
+                dump = (c == '1') || (c == 't') || (c == 'T') || (c == 'y') || (c == 'Y');
+                it = std::find(it, ctx.end(), '}');
+            }
+        }
+
+        return it;
+    }
+
+    template<typename FormatContext>
+    auto format(const fmtster::JSONStyle& s, FormatContext& ctx)
+    {
+        auto it = ctx.out();
+
+        if (!dump)
+            fmtster::FmtsterBase::sStyle = s;
+        else
+        {
+            using namespace std::string_literals;
+            using std::make_tuple;
+            using std::make_pair;
+
+            auto tup = make_tuple(
+                make_pair("formatSetting"s, s.formatSetting),
+                make_pair("styleSetting"s, s.styleSetting),
+                make_pair("tabSetting"s, s.tabSetting),
+                make_pair("braIndentSetting"s, s.braIndentSetting),
+                make_pair("dataIndentSetting"s, s.dataIndentSetting),
+                make_pair("disableBraces"s, s.disableBraces)
+            );
+            it = format_to(it,
+                           createFormatString(tup,
+                                              sStyle.dataIndent,
+                                              !sStyle.disableBraces,
+                                              false),
+                           tup);
+        }
+
+        return it;
+    }
+};
