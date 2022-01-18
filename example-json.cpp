@@ -82,10 +82,10 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
                      fmt::format_to(ctx.out(), "{{\n");
 
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
-                                        mFormatSetting,
+                                        formatSetting,
 1,
-                                        mTabSetting,
-                                        mDataIndentSetting);
+sStyle.tab.size(),
+                                        dataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
 
