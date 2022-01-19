@@ -140,6 +140,8 @@ Personnel GetPersonnel()
     };
 }
 
+#include <exception>
+
 int main()
 {
     // Based on https://json.org/example.html
@@ -170,4 +172,21 @@ int main()
     size_t personNumber = 0;
     for (auto person : GetPersonnel())
         cout << F("{}:\n{:,1,,1}\n", personNumber++, person) << endl;
+
+
+    cout << "\n\n" << endl;
+
+
+    fmtster::JSONStyle style{ .tab = "\t" };
+    cout << F("style: {}\n\n", style) << endl;
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
 }

@@ -1,4 +1,6 @@
 # **`fmtster` Change List**
+## **0.4.0**
+* Altered JSON style setting
 ## **0.3.0**
 * Fixed issues with `std::pair<>`
 * Added support for `std::tuple<>` (currently only meant to hold `std::pair<>`s

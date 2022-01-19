@@ -643,6 +643,8 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, map_of_vectors_of_strings_to_JSON)
 {
+    F("{}", fmtster::JSONStyle{});
+
     map<string, vector<string> > mapofvectorofstrings =
     {
         {
@@ -780,6 +782,8 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, EscapedValues)
 {
+    F("{}", fmtster::JSONStyle{});
+
     map<string, vector<string> > mapofvectorofstrings =
     {
         {
@@ -860,6 +864,8 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, Layers)
 {
+    F("{}", fmtster::JSONStyle{});
+
     // pair
     auto pr = make_pair("key"s, "value"s);
     string str = F("{}", pr);

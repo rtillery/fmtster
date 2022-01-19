@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#define FMTSTER_VERSION 000300 // 0.3.0
+#define FMTSTER_VERSION 000400 // 0.4.0
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -154,19 +154,17 @@ struct has_operator_index<
 //
 // is_ID<> declarations
 //
-template<template<typename...> class T, typename U>
-struct is_specialization_of : false_type
+template<typename T, typename = void>
+struct is_string : false_type
 {};
-template<template<typename...> class T, typename... Ts>
-struct is_specialization_of<T, T<Ts...>> : true_type
+template<class T, class Traits, class Alloc>
+struct is_string<std::basic_string<T, Traits, Alloc>, void> : true_type
 {};
-template<template<typename...> class T, typename... Ts>
-inline constexpr bool is_specialization_of_v =
-    is_specialization_of<T, T<Ts...> >::value;
-
-// @@@ TODO: Determine why is_string<> equivalent using is_specialization<> doesn't work
+template<class T, template<typename, typename, typename> class STRING>
+struct is_string<T, STRING<T, std::char_traits<T>, std::allocator<T> > > : true_type
+{};
 template<typename T>
-inline constexpr bool is_string_v = is_specialization_of_v<std::basic_string, T>;
+inline constexpr bool is_string_v = is_string<T>::value;
 
 fmtster_MAKEIS(container,
                (conjunction_v<has_const_iterator<T>, has_begin<T>, has_end<T> >));
@@ -241,6 +239,7 @@ struct JSONStyle
 // base class that handles formatting
 struct FmtsterBase
 {
+    static uint sFormat;
     static fmtster::JSONStyle sStyle;
 
     int formatSetting = 0;     // format (0 = JSON)
@@ -319,28 +318,55 @@ struct FmtsterBase
         std::smatch sm;
         std::regex_search(strFmt, sm, rx);
 
+        //
+        // Format
+        //   0, j*, J* = JSON
+        //
         auto strFormat = sm[1].str();
         if (!strFormat.empty())
         {
-            formatSetting = stoi(strFormat);
-            if (formatSetting != 0)
+            const auto c0 = strFormat[0];
+            if ((c0 == '0') ||
+                (c0 == 'j') ||
+                (c0 == 'J'))
+            {
+                sFormat = 0;
+            }
+            else
+            {
                 throw fmt::format_error(fmt::format("unsupported output format: \"{}\"",
-                                                    strFormat));
+                                                    escapeValue(strFormat)));
+            }
         }
+
+        // Style
+        //   Format == JSON
+        //     JSONStyle
+
+        // Per Call Parms
+        //   '-' - indicates next parm is negated
+        //   'b` - enable surrounding braces/brackets (default is enabled)
+        //   'f' - use format provided as default style (default is disabled)
+        //   's' - use Style provided as default style (default is disabled)
+        //   `!` - print provided or default format and provided or default
+        //         style (instead of data) (default is disabled)
+
+        // Indent
+        //   Baseline number of tab units to indent entire object (default 0)
+
+
 
 auto strStyle = sm[2].str();
 disableBraces = !strStyle.empty() && (stoi(strStyle) & 1);
 
 auto strTab = sm[3].str();
-int tabSetting = 2;
 if (!strTab.empty())
 {
-    tabSetting = stoi(strTab);
+    auto tabSetting = stoi(strTab);
+    sStyle.tab = (tabSetting > 0)
+                ? string(tabSetting, ' ')
+                : string(-tabSetting, '\t');
 }
-
-sStyle.tab = (tabSetting > 0)
-             ? string(tabSetting, ' ')
-             : string(-tabSetting, '\t');
 
         auto strIndent = sm[4].str();
         if (!strIndent.empty())
@@ -406,6 +432,7 @@ sStyle.tab.size(),
     }
 }; // struct FmtterBase
 
+extern uint FmtsterBase::sFormat;
 extern JSONStyle FmtsterBase::sStyle;
 
 } // namespace fmtster
@@ -641,27 +668,26 @@ struct fmt::formatter<fmtster::JSONStyle>
     : fmtster::FmtsterBase
 {
     template<typename FormatContext>
-    auto format(const fmtster::JSONStyle& s, FormatContext& ctx)
+    auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
     {
-        fmtster::FmtsterBase::sStyle = s;
+        fmtster::FmtsterBase::sStyle = style;
 
         auto it = ctx.out();
 
-        if (dumpStyle)
+        if (true) // dumpStyle)
         {
             using namespace std::string_literals;
-            using std::make_tuple;
             using std::make_pair;
 
-            auto tup = make_tuple(
-                make_pair("tab"s, s.tab)
-            );
-            it = format_to(it,
-                           createFormatString(tup,
-                                              dataIndent,
-                                              !disableBraces,
-                                              false),
-                           tup);
+            if (!disableBraces)
+                it = format_to(it, "{{\n");
+
+            const auto pr = make_pair("tab"s, style.tab);
+            it = format_to(it, createFormatString(pr, dataIndent, false, false), pr);
+
+            if (!disableBraces)
+                it = format_to(it, "\n{}}}", braIndent);
+
         }
 
         return it;
