@@ -239,8 +239,14 @@ struct JSONStyle
 // base class that handles formatting
 struct FmtsterBase
 {
-    static uint sFormat;
-    static fmtster::JSONStyle sStyle;
+    static uint sDefaultFormat;
+    static fmtster::JSONStyle sDefaultStyle;
+
+    fmtster::JSONStyle style;
+
+int styleIndex = -1;
+
+bool setDefaultStyle = false;
 
     int formatSetting = 0;     // format (0 = JSON)
 
@@ -322,19 +328,21 @@ struct FmtsterBase
         // Format
         //   0, j*, J* = JSON
         //
-        auto strFormat = sm[1].str();
-        if (!strFormat.empty())
+        const auto strFormat = sm[1].str();
+        if (strFormat.empty())
+        {
+            formatSetting = sDefaultFormat;
+        }
+        else
         {
             const auto c0 = strFormat[0];
-            if ((c0 == '0') ||
-                (c0 == 'j') ||
-                (c0 == 'J'))
+            if ((c0 == '0') || (c0 == 'j') || (c0 == 'J'))
             {
-                sFormat = 0;
+                formatSetting = 0;
             }
             else
             {
-                throw fmt::format_error(fmt::format("unsupported output format: \"{}\"",
+                throw fmt::format_error(fmt::format("unsupported format parameter: \"{}\"",
                                                     escapeValue(strFormat)));
             }
         }
@@ -342,6 +350,15 @@ struct FmtsterBase
         // Style
         //   Format == JSON
         //     JSONStyle
+        const auto strStyle = sm[2].str();
+        if (!strStyle.empty())
+        {
+            if (strStyle != "{}")
+                throw fmt::format_error(fmt::format("unsupported style parameter: \"{}\"",
+                                                    escapeValue(strStyle)));
+            else
+styleIndex = 1;
+        }
 
         // Per Call Parms
         //   '-' - indicates next parm is negated
@@ -350,24 +367,27 @@ struct FmtsterBase
         //   's' - use Style provided as default style (default is disabled)
         //   `!` - print provided or default format and provided or default
         //         style (instead of data) (default is disabled)
+        const auto strParms = sm[3].str();
+        if (!strParms.empty)
+        {
+            bool negate = false;
+            for (const auto c : strParms)
+            {
+                switch (c)
+                {
+                case 'b': disableBraces = negate; break;
+                case 'f': sDefaultFormat = formatSetting; break;
+                case 's': setDefaultStyle = true; break;
+                case '!': dumpStyle = true; break;
+                default: ;
+                }
+
+                negate = (c == '-');
+            }
+        }
 
         // Indent
         //   Baseline number of tab units to indent entire object (default 0)
-
-
-
-auto strStyle = sm[2].str();
-disableBraces = !strStyle.empty() && (stoi(strStyle) & 1);
-
-auto strTab = sm[3].str();
-if (!strTab.empty())
-{
-    auto tabSetting = stoi(strTab);
-    sStyle.tab = (tabSetting > 0)
-                ? string(tabSetting, ' ')
-                : string(-tabSetting, '\t');
-}
-
         auto strIndent = sm[4].str();
         if (!strIndent.empty())
         {
@@ -376,12 +396,14 @@ if (!strTab.empty())
                 throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
                                         braIndentSetting));
         }
-else
-    braIndentSetting = 0;
 
+
+// !!!! This can't be done here, because the style hasn't been read yet. But
+//      placing it in the format() function means it's not automatically
+//      available to all FmtsterBase children without an explicit call.
         braIndent.clear();
         for (int i = 0; i < braIndentSetting; i++)
-            braIndent += sStyle.tab;
+            braIndent += style.tab;
 
         dataIndentSetting = braIndentSetting;
         dataIndent = braIndent;
@@ -389,7 +411,7 @@ else
         if (!disableBraces)
         {
             dataIndentSetting++;
-            dataIndent += sStyle.tab;
+            dataIndent += style.tab;
         }
 
         return itCtxEnd;
