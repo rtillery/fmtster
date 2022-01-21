@@ -472,8 +472,7 @@ cout << __LINE__ << endl;
 
 
         // style
-//         const size_t STYLE_PARM_INDEX = 1;
-const size_t STYLE_PARM_INDEX = 2;
+        const size_t STYLE_PARM_INDEX = 1;
         if (mParmArgIndex[STYLE_PARM_INDEX])
         {
             auto tabArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
@@ -517,8 +516,7 @@ const size_t STYLE_PARM_INDEX = 2;
 
 
         // perm call parms
-//         const size_t PER_CALL_PARM_INDEX = 2;
-const size_t PER_CALL_PARM_INDEX = 1;
+        const size_t PER_CALL_PARM_INDEX = 2;
         if (mParmArgIndex[PER_CALL_PARM_INDEX])
         {
             auto barArg = ctx.arg(mParmArgIndex[PER_CALL_PARM_INDEX]);
@@ -617,8 +615,8 @@ cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " <
     {
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
-!addBraces ? 1 : 0,
 mStyle.tab.size(),
+!addBraces ? 1 : 0,
                            mDataIndentSetting,
                            addComma ? "," : "");
     }
