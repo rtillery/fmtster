@@ -30,6 +30,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <iostream>
 using std::cout;
@@ -48,6 +49,7 @@ using std::false_type;
 using std::conjunction_v;
 using std::disjunction_v;
 using std::negation;
+using std::vector;
 
 // short helper alias for fmt::format() used by adding "using fmtster::F;" to
 //  client code
@@ -232,6 +234,93 @@ void ForEachElement(const std::tuple<Ts...>& tup, F fn)
     ForEachElement(tup, fn, std::make_index_sequence<sizeof...(Ts)>());
 }
 
+template<typename T>
+T EscapeJSONString(const T& val)
+{
+    return val;
+}
+// escape string the JSON way
+template<>
+string EscapeJSONString(const string& str)
+{
+    string out;
+    out.reserve(str.length() * 6);
+    for (const char c : str)
+    {
+        if ((c <= '\x1F') || (c >= '\x7F'))
+        {
+            switch (c)
+            {
+            case '\b': out += R"(\b)"; break;
+            case '\f': out += R"(\f)"; break;
+            case '\n': out += R"(\n)"; break;
+            case '\r': out += R"(\r)"; break;
+            case '\t': out += R"(\t)"; break;
+            default:
+                out += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
+            }
+        }
+        else
+        {
+            switch (c)
+            {
+            case '\\':   out += R"(\\)"; break;
+            case '\"':   out += R"(\")"; break;
+            case '/':    out += R"(\/)"; break;
+            case '\x7F': out += R"(\u007F)"; break;
+            default:     out += c;
+            }
+        }
+    }
+
+    return out;
+} // EscapeJSONString()
+
+template<typename T>
+int TypeToInt(const T&);
+template<>
+int TypeToInt(const string& str)
+{
+    return stoi(str);
+}
+template<>
+int TypeToInt(const char* const& sz)
+{
+    return ::atoi(sz);
+}
+template<>
+int TypeToInt(const int& i)
+{
+    return i;
+}
+
+int FormatToInt(const char* sz)
+{
+    int format = -1;
+    if (sz)
+    {
+        const auto c0 = *sz;
+        if ((c0 == '0') || (c0 == 'j') || (c0 == 'J'))
+        {
+            format = 0;
+        }
+        else
+        {
+            throw fmt::format_error(F("unsupported format parameter: \"{}\"",
+                                      EscapeJSONString(string(sz))));
+        }
+    }
+    return format;
+}
+int FormatToInt(const string& str)
+{
+    return FormatToInt(str.c_str());
+}
+int FormatToInt(int i)
+{
+    return i;
+}
+
 } // namespace internal
 
 // JSON style structure for re-use
@@ -246,63 +335,23 @@ struct FmtsterBase
     static uint sDefaultFormat;
     static fmtster::JSONStyle sDefaultStyle;
 
-    fmtster::JSONStyle style;
+    // results of parsing for use in format()
+    vector<string> mParmData = { "" };
+    vector<int> mParmArgIndex = { 0 };
 
-    int bracedArgs[4] = { 0 };
+    fmtster::JSONStyle mStyle;
 
-bool setDefaultStyle = false;
+    bool mSetDefaultStyle = false;
+    int mFormatSetting = 0;     // format (0 = JSON)
 
-    int formatSetting = 0;     // format (0 = JSON)
+    int mBraIndentSetting = 0;  // beginning number of brace/bracket indents
+    int mDataIndentSetting = 1; // beginning number of data indents
 
-    int braIndentSetting = 0;  // beginning number of brace/bracket indents
-    int dataIndentSetting = 1; // beginning number of data indents
+    bool mDisableBras = false;
+    bool mDumpStyle = false;
 
-    bool disableBraces = false;
-    bool dumpStyle = false;
-
-    string braIndent = "";     // expanded brace/bracket indent
-    string dataIndent = "  ";  // expanded data indent
-
-    template<typename T>
-    T escapeValue(const T& val)
-    {
-        return val;
-    }
-    // escape string the JSON way
-    string escapeValue(const string& str)
-    {
-        string out;
-        out.reserve(str.length() * 6);
-        for (const char c : str)
-        {
-            if ((c <= '\x1F') || (c >= '\x7F'))
-            {
-                switch (c)
-                {
-                case '\b': out += R"(\b)"; break;
-                case '\f': out += R"(\f)"; break;
-                case '\n': out += R"(\n)"; break;
-                case '\r': out += R"(\r)"; break;
-                case '\t': out += R"(\t)"; break;
-                default:
-                    out += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
-                }
-            }
-            else
-            {
-                switch (c)
-                {
-                case '\\':   out += R"(\\)"; break;
-                case '\"':   out += R"(\")"; break;
-                case '/':    out += R"(\/)"; break;
-                case '\x7F': out += R"(\u007F)"; break;
-                default:     out += c;
-                }
-            }
-        }
-
-        return out;
-    } // escapeValue()
+    string mBraIndent = "";     // expanded brace/bracket indent
+    string mDataIndent = "  ";  // expanded data indent
 
     // Parses the format in the format {<format>,<style>,<tab>,<indent>}.
     // > format (default is 0: JSON):
@@ -316,244 +365,227 @@ bool setDefaultStyle = false;
     //     negative integers: hard tabs
     // > indent (default is 0):
     //     positive integers: number of <tab>s to start the indent
+
+
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-        using fmtster::F;
-
+        // generic handling of N comma-separated parms, including recursive braces
 auto i = ctx.begin();
 cout << "parse(): format string: \"";
 while (i != ctx.end())
     cout << *(i++);
 cout << "\"" << endl;
 
-//         auto it = find(ctx.begin(), ctx.end(), '}');
-//         const string strFmt(ctx.begin(), it);
-// auto it = ctx.begin();
-// int braces = 1;
-// while (it != ctx.end())
-// {
-//     const auto c = *it;
-//     if (c == '}')
-//     {
-//         if (!--braces)
-//             break;
-//     }
-//     else if (c == '{')
-//         braces++;
-//     it++;
-// }
-// const string strFmt(ctx.begin(), it);
-
-//         std::regex rx("([^,]*),?([^,]*),?([^,]*),?([^,]*)");
-//         std::smatch sm;
-//         std::regex_search(strFmt, sm, rx);
-
-auto it = ctx.begin();
-int braces = 1;
-string parm[4];
-int parmIndex = 0;
-int parmStart = 0;
-while (it != ctx.end())
-{
-    const auto c = *it;
-    if (c == '}')
-    {
-        if (!--braces)
-            break;
-        if (parmIndex < 4)
-            parm[parmIndex] += c;
-    }
-    else if (c == '{')
-    {
-        if (parmIndex < 4)
+        int parmIndex = 0;
+        int braces = 1;
+        auto it = ctx.begin();
+        while (it != ctx.end())
         {
-            bracedArgs[parmIndex] = ctx.next_arg_id();
-            parm[parmIndex] += c;
-        }
-        braces++;
-    }
-    else if (c == ',')
-    {
-        parmIndex++;
-    }
-    else
-    {
-        if (parmIndex < 4)
-            parm[parmIndex] += c;
-    }
-    it++;
-}
-
-// cout << "[0]: \"" << sm[0].str() << "\"\n"
-//      << "[1]: \"" << sm[1].str() << "\"\n"
-//      << "[2]: \"" << sm[2].str() << "\"\n"
-//      << "[3]: \"" << sm[3].str() << "\"\n"
-//      << "[4]: \"" << sm[4].str() << "\"" << endl;
-
-// cout << fmt::format("{}", parm) << endl;
-cout << "[0]: \"" << parm[0] << "\"\n"
-     << "[1]: \"" << parm[1] << "\"\n"
-     << "[2]: \"" << parm[2] << "\"\n"
-     << "[3]: \"" << parm[3] << "\"" << endl;
-// @@@ Temporarily use this order for the parms to be mostly compatible with
-//     testing as we move toward the end goal:
-//     { format, brace disable (1), tab size (JSONStyle stand-in), indent }
-
-        //
-        // Format
-        //   0, j*, J* = JSON
-        //
-//         const auto strFormat = sm[1].str();
-const auto& strFormat = parm[0];
-//         if (strFormat.empty())
-if (!strFormat.empty() && bracedArgs[0])
-//         {
-//             formatSetting = sDefaultFormat;
-//         }
-//         else
-        {
-            const auto c0 = strFormat[0];
-            if ((c0 == '0') || (c0 == 'j') || (c0 == 'J'))
+            const auto c = *it;
+            if (c == '{')
             {
-                formatSetting = 0;
+                mParmArgIndex[parmIndex] = ctx.next_arg_id();
+                braces++;
+            }
+            else if (c == '}')
+            {
+                --braces;
+                if (!braces)
+                    break;
+            }
+            else if (c == ',')
+            {
+                parmIndex++;
+                mParmData.resize(parmIndex + 1);
+                mParmArgIndex.resize(parmIndex + 1);
             }
             else
             {
-                throw fmt::format_error(fmt::format("({}) unsupported format parameter: \"{}\"",
-                                                    __LINE__,
-                                                    escapeValue(strFormat)));
+                mParmData[parmIndex] += c;
             }
+            it++;
         }
 
-        // Style
-        //   Format == JSON
-        //     JSONStyle
-//         const auto strStyle = sm[2].str();
-// const auto strStyle = sm[3].str();
-const auto& strStyle = parm[2];
-//         if (!strStyle.empty())
-if (!strStyle.empty() && bracedArgs[2])
-        {
-//             if (strStyle != "{}")
-//                 throw fmt::format_error(fmt::format("({}) unsupported style parameter: \"{}\"",
-//                                                     __LINE__,
-//                                                     escapeValue(strStyle)));
-//             else
-// styleIndex = 1;
+cout << "[0]: \"" << mParmData[0] << "\", " << mParmArgIndex[0] << endl;
+if (mParmData.size() > 1)
+    cout << "[1]: \"" << mParmData[1] << "\", " << mParmArgIndex[1] << endl;
+if (mParmData.size() > 2)
+    cout << "[2]: \"" << mParmData[2] << "\", " << mParmArgIndex[2] << endl;
+if (mParmData.size() > 3)
+    cout << "[3]: \"" << mParmData[3] << "\", " << mParmArgIndex[3] << endl;
 
-// @@@ DANGER: Only a value or "{}" works correctly
-// if (strStyle == "{}")
-// {
-//
-// }
-// else
-{
-    auto tabSetting = stoi(strStyle);
-    style.tab = (tabSetting > 0)
-                ? string(tabSetting, ' ')
-                : string(-tabSetting, '\t');
-}
-        }
-
-        // Per Call Parms
-        //   '-' - indicates next parm is negated
-        //   'b` - enable surrounding braces/brackets (default is enabled)
-        //   'f' - use format provided as default style (default is disabled)
-        //   's' - use Style provided as default style (default is disabled)
-        //   `!` - print provided or default format and provided or default
-        //         style (instead of data) (default is disabled)
-//         const auto strParms = sm[3].str();
-// const auto strParms = sm[2].str();
-const auto& strParms = parm[1];
-//         if (!strParms.empty())
-if (!strParms.empty() && bracedArgs[1])
-        {
-            bool negate = false;
-            for (const auto c : strParms)
-            {
-                switch (c)
-                {
-                case 'b': disableBraces = negate; break;
-                case 'f': sDefaultFormat = formatSetting; break;
-                case 's': setDefaultStyle = true; break;
-                case '!': dumpStyle = true; break;
-case '1': disableBraces = true; break;
-                default: ;
-                }
-
-                negate = (c == '-');
-            }
-        }
-
-        // Indent
-        //   Baseline number of tab units to indent entire object (default 0)
-//         auto strIndent = sm[4].str();
-const auto& strIndent = parm[3];
-//         if (!strIndent.empty())
-if (!strIndent.empty() && bracedArgs[3])
-        {
-            braIndentSetting = stoi(strIndent);
-            if (braIndentSetting < 0)
-                throw fmt::format_error(fmt::format("({}) invalid indent: \"{}\"",
-                                                    __LINE__,
-                                                    braIndentSetting));
-        }
-
-// cout << "*it: '";
-// if (it != ctx.end())
-//     cout << *it;
-// else
-//     cout << "<end>";
-// cout << "'" << endl;
         return it;
     } // parse()
+
+
 
     // This function must be called by each FmtsterBase child immediately on
     //  entry to the format() function. It completes the updating of the style
     //  object based on arguments provided, if necessary.
     template<typename FormatContext>
-    void handleBracedParmsAndInitVars(FormatContext& ctx)
+    void decipherParms(FormatContext& ctx)
     {
-        if (bracedArgs[2])
-        {
-            // @@@ I'm not sure whether this will work for a sub-brace
-            //     argument that is a custom object. So as a first test, use
-            //     an integer that works like the old tab specifier.
+        using namespace fmtster::internal;
 
-            auto arg = ctx.arg(bracedArgs[2]);
-            int value = visit_format_arg(
-                [](auto argval) -> int
+cout << __LINE__ << endl;
+
+        // ensure vectors are large enough for unchecked processing below
+        mParmData.resize(4, "");
+        mParmArgIndex.resize(4, 0);
+
+        // format
+        const size_t FORMAT_PARM_INDEX = 0;
+        if (mParmArgIndex[FORMAT_PARM_INDEX])
+        {
+            auto formatArg = ctx.arg(mParmArgIndex[FORMAT_PARM_INDEX]);
+            auto formatSetting = visit_format_arg(
+                [](auto value) -> int
                 {
-//                     return argval;
-return 0;
+                    // This construct is required because at compile time all
+                    //  paths are linked, even though that are not allowed at
+                    //  run time, and without this, the return value doens't
+                    //  match the function return value in some cases, so the
+                    //  compile fails.
+                    if constexpr (std::is_integral_v<decltype(value)>)
+                    {
+                        return value;
+                    }
+                    else
+                    {
+                        throw fmt::format_error("unsupported nested argument type");
+                    }
                 },
-                arg);
+                formatArg);
 
-            style.tab = (value > 0)
-                        ? string(value, ' ')
-                        : string(-value, '\t');
+            mFormatSetting = FormatToInt(formatSetting);
         }
-
-        if (setDefaultStyle)
-            sDefaultStyle = style;
-
-        // create indent string for braces
-        braIndent.clear();
-        for (int i = 0; i < braIndentSetting; i++)
-            braIndent += style.tab;
-
-        // create indent string for data
-        dataIndentSetting = braIndentSetting;
-        dataIndent = braIndent;
-
-        // indent more if there are braces/brackets
-        if (!disableBraces)
+        else if(!mParmData[FORMAT_PARM_INDEX].empty())
         {
-            dataIndentSetting++;
-            dataIndent += style.tab;
+            mFormatSetting = FormatToInt(mParmData[FORMAT_PARM_INDEX]);
         }
-    } // handleBracedParmsAndInitVars()
+
+        if (mFormatSetting != 0)
+        {
+            throw fmt::format_error(F("unsupported format"));
+        }
+
+
+        // style
+//         const size_t STYLE_PARM_INDEX = 1;
+const size_t STYLE_PARM_INDEX = 2;
+        if (mParmArgIndex[STYLE_PARM_INDEX])
+        {
+            auto tabArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
+            auto tabSetting = FormatToInt(
+                visit_format_arg(
+                    [](auto value) -> int
+                    {
+                        if constexpr (std::is_integral_v<decltype(value)>)
+                        {
+                            return value;
+                        }
+                        else
+                        {
+                            throw fmt::format_error("unsupported nested argument type");
+                        }
+                    },
+                    tabArg)
+                );
+
+            mStyle.tab = (tabSetting > 0)
+                        ? string(tabSetting, ' ')
+                        : string(-tabSetting, '\t');
+        }
+        else if(!mParmData[STYLE_PARM_INDEX].empty())
+        {
+            int tabSetting = TypeToInt(mParmData[STYLE_PARM_INDEX]);
+            mStyle.tab = (tabSetting > 0)
+                        ? string(tabSetting, ' ')
+                        : string(-tabSetting, '\t');
+
+            mBraIndent.clear();
+            auto i = mBraIndentSetting;
+            while (i--)
+                mBraIndent += mStyle.tab;
+
+            mDataIndent.clear();
+            i = mDataIndentSetting;
+            while (i--)
+                mDataIndent += mStyle.tab;
+        }
+
+
+        // perm call parms
+//         const size_t PER_CALL_PARM_INDEX = 2;
+const size_t PER_CALL_PARM_INDEX = 1;
+        if (mParmArgIndex[PER_CALL_PARM_INDEX])
+        {
+            auto barArg = ctx.arg(mParmArgIndex[PER_CALL_PARM_INDEX]);
+            auto braSetting = visit_format_arg(
+                [](auto value) -> int
+                {
+                    if constexpr (std::is_integral_v<decltype(value)>)
+                    {
+                        return value;
+                    }
+                    else
+                    {
+                        throw fmt::format_error("unsupported nested argument type");
+                    }
+                },
+                barArg);
+
+            mDisableBras = FormatToInt(braSetting);
+        }
+        else if (!mParmData[PER_CALL_PARM_INDEX].empty())
+        {
+            mDisableBras = !!TypeToInt(mParmData[PER_CALL_PARM_INDEX]);
+        }
+
+
+        // indent
+        const size_t INDENT_PARM_INDEX = 3;
+        if (mParmArgIndex[INDENT_PARM_INDEX])
+        {
+            auto indentArg = ctx.arg(mParmArgIndex[INDENT_PARM_INDEX]);
+            auto indentSetting = visit_format_arg(
+                [](auto value) -> int
+                {
+                    if constexpr (std::is_integral_v<decltype(value)>)
+                    {
+                        return value;
+                    }
+                    else
+                    {
+                        throw fmt::format_error("unsupported nested argument type");
+                    }
+                },
+                indentArg);
+            mBraIndentSetting = FormatToInt(indentSetting);
+        }
+        else if (!mParmData[INDENT_PARM_INDEX].empty())
+        {
+            mBraIndentSetting = TypeToInt(mParmData[INDENT_PARM_INDEX]);
+        }
+
+        if (mBraIndentSetting < 0)
+            throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
+                                                mBraIndentSetting));
+
+        mDataIndentSetting = mDisableBras ? mBraIndentSetting : mBraIndentSetting + 1;
+cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " << mDataIndentSetting << endl;
+
+        mBraIndent.clear();
+        auto i = mBraIndentSetting;
+        while (i--)
+            mBraIndent += mStyle.tab;
+
+        mDataIndent.clear();
+        i = mDataIndentSetting;
+        while (i--)
+            mDataIndent += mStyle.tab;
+    } // decipherParms()
 
     // templated function to provide non-container {fmt} string
     template<typename T, typename = void>
@@ -584,10 +616,10 @@ return 0;
                            bool addComma)
     {
         return fmt::format("{{:{},{},{},{}}}{}",
-                           formatSetting,
+                           mFormatSetting,
 !addBraces ? 1 : 0,
-style.tab.size(),
-                           dataIndentSetting,
+mStyle.tab.size(),
+                           mDataIndentSetting,
                            addComma ? "," : "");
     }
 }; // struct FmtterBase
@@ -618,19 +650,20 @@ struct fmt::formatter<T,
         while (itC != c.end())
         {
             std::string fmtStr;
-            if (!disableBraces || (itC != c.begin()))
+
+            if (!mDisableBras || (itC != c.begin()))
                 fmtStr = "\n";
 
             const auto& val = *itC;
 
             if (!is_braceable_v<C>)
-                fmtStr += dataIndent;
+                fmtStr += mDataIndent;
 
             itC++;
 
             fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
 
-            itOut = fmt::format_to(itOut, fmtStr, escapeValue(val));
+            itOut = fmt::format_to(itOut, fmtStr, fmtster::internal::EscapeJSONString(val));
         }
     }
 
@@ -639,6 +672,8 @@ struct fmt::formatter<T,
     std::enable_if_t<fmtster::internal::is_multimappish_v<C> >
         format_loop(const C& c, FCIt_t<FormatContext>& itOut)
     {
+        using namespace fmtster::internal;
+
         auto remainingElements = c.size();
         if (c.empty())
         {
@@ -650,13 +685,13 @@ struct fmt::formatter<T,
             while (it != c.end())
             {
                 std::string fmtStr;
-                if (!disableBraces || (it != c.begin()))
+                if (!mDisableBras || (it != c.begin()))
                     fmtStr = "\n";
 
                 const auto& key = it->first;
-                fmtStr += createFormatString(key, dataIndent, false, false);
+                fmtStr += createFormatString(key, mDataIndent, false, false);
                 fmtStr += " : ";
-                itOut = fmt::format_to(itOut, fmtStr, escapeValue(key));
+                itOut = fmt::format_to(itOut, fmtStr, EscapeJSONString(key));
 
                 std::vector<typename C::mapped_type> vals;
                 do
@@ -675,31 +710,32 @@ struct fmt::formatter<T,
     template<typename FormatContext>
     auto format(const T& sc, FormatContext& ctx)
     {
+cout << "format()" << endl;
         using namespace fmtster::internal;
 
-handleBracedParmsAndInitVars(ctx);
+decipherParms(ctx);
 
         // output opening bracket/brace (if enabled)
-        auto itOut = disableBraces ?
+        auto itOut = mDisableBras ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), is_braceable_v<T> ? "{{" : "[");
 
         const bool empty = (sc.end() == sc.begin());
 
-        if (empty && !disableBraces)
+        if (empty && !mDisableBras)
             itOut = fmt::format_to(itOut, " ");
         else
             format_loop<FormatContext, T>(sc, itOut);
 
         // output closing brace
-        if (!disableBraces)
+        if (!mDisableBras)
         {
             if (empty)
                 itOut = fmt::format_to(itOut, is_braceable_v<T> ? "}}" : "]");
             else
                 itOut = fmt::format_to(itOut,
                                        is_braceable_v<T> ? "\n{}}}" : "\n{}]",
-                                       braIndent);
+                                       mBraIndent);
         }
 
         return itOut;
@@ -752,15 +788,15 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
     {
         std::string fmtStr;
 
-        if (!disableBraces)
+        if (!mDisableBras)
             fmtStr += "{{\n";
 
-        fmtStr += createFormatString(v1, dataIndent, false, false);
+        fmtStr += createFormatString(v1, mDataIndent, false, false);
         fmtStr += " : ";
         fmtStr += createFormatString(v2, "", true, false);
 
-        if (!disableBraces)
-            fmtStr += fmt::format("\n{}}}}}", braIndent);
+        if (!mDisableBras)
+            fmtStr += fmt::format("\n{}}}}}", mBraIndent);
 
         return fmtStr;
     } // createPairFormatString()
@@ -768,11 +804,12 @@ struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
     template<typename FormatContext>
     auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
     {
-handleBracedParmsAndInitVars(ctx);
+        using namespace fmtster::internal;
+decipherParms(ctx);
 
         return format_to(ctx.out(),
                          createPairFormatString(p.first, p.second),
-                         escapeValue(p.first), escapeValue(p.second));
+                         EscapeJSONString(p.first), EscapeJSONString(p.second));
     }
 }; // struct fmt::formatter<std::pair<> >
 
@@ -785,16 +822,16 @@ struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
     {
         using namespace fmtster::internal;
 
-handleBracedParmsAndInitVars(ctx);
+decipherParms(ctx);
 
         // output opening bracket (if enabled)
-        auto itOut = disableBraces ?
+        auto itOut = mDisableBras ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), "{{");
         auto count = sizeof...(Ts);
 
         const bool empty = !count;
-        if (empty && !disableBraces)
+        if (empty && !mDisableBras)
         {
             itOut = fmt::format_to(itOut, " ");
         }
@@ -804,23 +841,23 @@ handleBracedParmsAndInitVars(ctx);
                            [&](const auto& elem)
                            {
                                std::string fmtStr;
-                               if (!disableBraces || (count != sizeof...(Ts)))
+                               if (!mDisableBras || (count != sizeof...(Ts)))
                                    fmtStr = "\n";
 
                                fmtStr += createFormatString(elem,
-                                                            dataIndent,
+                                                            mDataIndent,
                                                             false,
                                                             --count);
                                itOut = fmt::format_to(itOut, fmtStr, elem);
                            });
 
             // output closing brace
-            if (!disableBraces)
+            if (!mDisableBras)
             {
                 if (empty)
                     itOut = fmt::format_to(itOut, "}");
                 else
-                    itOut = fmt::format_to(itOut, "\n{}}}", braIndent);
+                    itOut = fmt::format_to(itOut, "\n{}}}", mBraIndent);
             }
         }
 
@@ -847,14 +884,14 @@ struct fmt::formatter<fmtster::JSONStyle>
             using namespace std::string_literals;
             using std::make_pair;
 
-            if (!disableBraces)
+            if (!mDisableBras)
                 it = format_to(it, "{{\n");
 
             const auto pr = make_pair("tab"s, style.tab);
-            it = format_to(it, createFormatString(pr, dataIndent, false, false), pr);
+            it = format_to(it, createFormatString(pr, mDataIndent, false, false), pr);
 
-            if (!disableBraces)
-                it = format_to(it, "\n{}}}", braIndent);
+            if (!mDisableBras)
+                it = format_to(it, "\n{}}}", mBraIndent);
 
         }
 

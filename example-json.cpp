@@ -77,15 +77,15 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         //  main(), but this to illustrates use of the fmt::format_to() call
         //  and care that needs to be taken with JSON commas
 
-        auto itOut = disableBraces ?
+        auto itOut = mDisableBras ?
                      ctx.out() :
                      fmt::format_to(ctx.out(), "{{\n");
 
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
-                                        formatSetting,
+                                        mFormatSetting,
 1,
-style.tab.size(),
-                                        dataIndentSetting);
+mStyle.tab.size(),
+                                        mDataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
 
@@ -100,7 +100,7 @@ style.tab.size(),
         itOut = format_to(itOut, FMTSTR, mp("phones"s, p.phones));
         itOut = format_to(itOut, FMTSTR_NOCOMMA, mp("family"s, p.family));
 
-        if (!disableBraces)
+        if (!mDisableBras)
             itOut = fmt::format_to(itOut, "\n}}");
 
         return itOut;
@@ -190,5 +190,9 @@ int main()
     try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
     try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
 
+cout << "** " << __LINE__ << endl;
+    cout << F("{:,,8}", msi) << endl;
+cout << "** " << __LINE__ << endl;
     cout << F("{:,,{}}", msi, 8) << endl;
+cout << "** " << __LINE__ << endl;
 }
