@@ -84,7 +84,7 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
                                         formatSetting,
 1,
-sStyle.tab.size(),
+style.tab.size(),
                                         dataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
@@ -189,4 +189,6 @@ int main()
     try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
     try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
     try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
+    cout << F("{:,,{}}", msi, 8) << endl;
 }
