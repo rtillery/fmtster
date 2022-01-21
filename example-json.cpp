@@ -190,9 +190,22 @@ int main()
     try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
     try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
 
+    try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
 cout << "** " << __LINE__ << endl;
     cout << F("{:,8}", msi) << endl;
 cout << "** " << __LINE__ << endl;
     cout << F("{:,{}}", msi, 8) << endl;
 cout << "** " << __LINE__ << endl;
+    cout << F("{:,{},1,4}", msi, 8) << endl;
+cout << "** " << __LINE__ << endl;
+    cout << F("{:,{},,4}", msi, 8) << endl;
+cout << "** " << __LINE__ << endl;
+    cout << F("{:,{},,{}}", msi, 8, 4) << endl;
+cout << "** " << __LINE__ << endl;
+    cout << F("{:,{},{},{}}", msi, 8, 1, 4) << endl;
+cout << "** " << __LINE__ << endl;
+// not ready for prime time
+//     cout << F("{:{},{},{},{}}", msi, 0, -1, 0, 2) << endl;
+// cout << "** " << __LINE__ << endl;
 }

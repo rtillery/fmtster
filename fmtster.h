@@ -475,43 +475,72 @@ cout << __LINE__ << endl;
         const size_t STYLE_PARM_INDEX = 1;
         if (mParmArgIndex[STYLE_PARM_INDEX])
         {
-            auto tabArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
-            auto tabSetting = FormatToInt(
-                visit_format_arg(
-                    [](auto value) -> int
-                    {
-                        if constexpr (std::is_integral_v<decltype(value)>)
-                        {
-                            return value;
-                        }
-                        else
-                        {
-                            throw fmt::format_error("unsupported nested argument type");
-                        }
-                    },
-                    tabArg)
-                );
+//             auto tabArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
+//             auto tabSetting = FormatToInt(
+//                 visit_format_arg(
+//                     [](auto value) -> int
+//                     {
+//                         if constexpr (std::is_integral_v<decltype(value)>)
+//                         {
+//                             return value;
+//                         }
+//                         else
+//                         {
+//                             throw fmt::format_error("unsupported nested argument type");
+//                         }
+//                     },
+//                     tabArg)
+//                 );
 
-            mStyle.tab = (tabSetting > 0)
-                        ? string(tabSetting, ' ')
-                        : string(-tabSetting, '\t');
+//             mStyle.tab = (tabSetting > 0)
+//                         ? string(tabSetting, ' ')
+//                         : string(-tabSetting, '\t');
+
+auto styleArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
+auto styleObj = visit_format_arg(
+    [](auto value) -> JSONStyle
+    {
+        // This construct is required because at compile time all
+        //  paths are linked, even though that are not allowed at
+        //  run time, and without this, the return value doens't
+        //  match the function return value in some cases, so the
+        //  compile fails.
+cout << typeid(value).name() << endl;
+
+        if constexpr (std::is_same_v<const char*, decltype(value)>)
+        {
+            throw fmt::format_error("unsupported nested argument type **");
+        }
+        else if constexpr (std::is_same_v<const JSONStyle, decltype(value)>)
+        {
+            return value;
+        }
+        else
+        {
+            throw fmt::format_error("unsupported nested argument type");
+        }
+    },
+    styleArg);
+
+
         }
         else if(!mParmData[STYLE_PARM_INDEX].empty())
         {
-            int tabSetting = TypeToInt(mParmData[STYLE_PARM_INDEX]);
-            mStyle.tab = (tabSetting > 0)
-                        ? string(tabSetting, ' ')
-                        : string(-tabSetting, '\t');
+throw fmt::format_error("unsupported style parameter type (must be JSONStyle object)");
+//             int tabSetting = TypeToInt(mParmData[STYLE_PARM_INDEX]);
+//             mStyle.tab = (tabSetting > 0)
+//                         ? string(tabSetting, ' ')
+//                         : string(-tabSetting, '\t');
 
-            mBraIndent.clear();
-            auto i = mBraIndentSetting;
-            while (i--)
-                mBraIndent += mStyle.tab;
+//             mBraIndent.clear();
+//             auto i = mBraIndentSetting;
+//             while (i--)
+//                 mBraIndent += mStyle.tab;
 
-            mDataIndent.clear();
-            i = mDataIndentSetting;
-            while (i--)
-                mDataIndent += mStyle.tab;
+//             mDataIndent.clear();
+//             i = mDataIndentSetting;
+//             while (i--)
+//                 mDataIndent += mStyle.tab;
         }
 
 
@@ -615,7 +644,7 @@ cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " <
     {
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
-mStyle.tab.size(),
+mStyle, // mStyle.tab.size(),
 !addBraces ? 1 : 0,
                            mDataIndentSetting,
                            addComma ? "," : "");
