@@ -24,6 +24,7 @@
 #define FMTSTER_VERSION 000400 // 0.4.0
 
 #include <algorithm>
+#include <cstdint>
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <regex>
@@ -318,30 +319,166 @@ int FormatToInt(const string& str)
 }
 int FormatToInt(int i)
 {
+    if (i != 0)
+    {
+        throw fmt::format_error(F("unsupported format parameter: \"{}\"",
+                                  i));
+    }
     return i;
 }
 
 } // namespace internal
 
-// JSON style structure for re-use
-struct JSONStyle
+// JSON style class
+class JSONStyle
 {
+public:
     string tab = "  ";         // expanded tab
+
+    enum STYLEDEFS
+    {
+        BLANK               = 0x0,  // gap
+        STYLE = BLANK,              // empty arrays/objs,
+                                    // single value arrays/objs
+        reserved_1          = 0x1,  // gap
+        NOSPACE = reserved_1,       // empty arrays/objs
+        SAMELINE = reserved_1,      // single value arrays/objs
+        SPACE               = 0x2,  // gap
+        // SPACE = SPACE            // empty arrays/objs
+        SPACEx2             = 0x3,  // gap
+        reserved_4          = 0x4,  // gap
+        reserved_5          = 0x5,  // gap
+        TAB                 = 0x6,  // gap
+        TABx2               = 0x7,  // gap
+        NEWLINE             = 0x8,  // gap
+        reserved_9          = 0x9,  // gap
+        NEWLINE_SPACE       = 0xA,  // gap
+        NEWLINE_SPACEx2     = 0xB,  // gap
+        reserved_C          = 0xC,  // gap
+        reserved_D          = 0xD,  // gap
+        NEWLINE_TAB         = 0xE,  // gap
+        NEWLINE_TABx2       = 0xF   // gap
+    };
+
+    struct JSONStyleConfig
+    {
+        bool cr : 1;
+        bool lf : 1;
+
+        bool hardTab : 1;
+        unsigned int tabCount : 4;
+
+        // [ <gap A> value, <gap B> value <gap C> ]
+        unsigned int gapA : 4;
+        unsigned int gapB : 4;
+        unsigned int gapC : 4;
+
+        // { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> }
+        unsigned int gap1 : 4;
+        unsigned int gap2 : 4;
+        unsigned int gap3 : 4;
+        unsigned int gap4 : 4;
+        unsigned int gap5 : 4;
+        unsigned int gap6 : 4;
+        unsigned int gap7 : 4;
+
+        unsigned int emptyArray : 2;
+        unsigned int emptyObject : 2;
+        unsigned int sva : 2;
+        unsigned int svo : 2;
+    };
+
+    union JSONStyleUnion
+    {
+        JSONStyleConfig vConfig;
+        uint64_t vValue;
+    };
+
+    static constexpr JSONStyleUnion DEFAULTCONFIG =
+    {
+        .vConfig =
+        {
+#ifdef _WIN32
+            .cr = true,
+            .lf = true,
+#elif defined macintosh
+            .cr = true,
+            .lf = false,
+#else
+            .cr = false,
+            .lf = true,
+#endif
+
+            .hardTab = false,
+            .tabCount = 2,
+
+            .gapA = NEWLINE_TAB,
+            .gapB = SPACE,
+            .gapC = SPACE,
+
+            .gap1 = NEWLINE_TAB,
+            .gap2 = BLANK,
+            .gap3 = SPACE,
+            .gap4 = NEWLINE_TAB,
+            .gap5 = BLANK,
+            .gap6 = SPACE,
+            .gap7 = NEWLINE,
+
+            .emptyArray = SPACE,
+            .emptyObject = SPACE,
+            .sva = SAMELINE,
+            .svo = SAMELINE,
+        } // .vStyle
+    };
+
+    JSONStyleUnion mStyle;
+
+    JSONStyle(uint64_t value = DEFAULTCONFIG.vValue)
+    {
+        if (value)
+            mStyle.vValue = value;
+        else
+            mStyle.vValue = DEFAULTCONFIG.vValue;
+    }
+
+    uint64_t& value()
+    {
+        return mStyle.vValue;
+    }
+    const uint64_t& cvalue() const
+    {
+        return mStyle.vValue;
+    }
+    JSONStyleConfig& config()
+    {
+        return mStyle.vConfig;
+    }
+    const JSONStyleConfig& cconfig() const
+    {
+        return mStyle.vConfig;
+    }
+
+    static_assert(sizeof(uint64_t) == (64 / 8));
+    static_assert(sizeof(JSONStyleConfig) <= sizeof(uint64_t));
+    static_assert(sizeof(JSONStyleUnion) == sizeof(uint64_t));
+
+//     char (*__kaboom)[sizeof(uint64_t)] = 1;
+//     char (*__kaboom)[sizeof(JSONStyleConfig)] = 1;
+//     char (*__kaboom)[sizeof(JSONStyleUnion)] = 1;
 };
 
 // base class that handles formatting
 struct FmtsterBase
 {
-    static uint sDefaultFormat;
+    static unsigned int sDefaultFormat;
     static fmtster::JSONStyle sDefaultStyle;
 
     // results of parsing for use in format()
     vector<string> mParmData = { "" };
     vector<int> mParmArgIndex = { 0 };
 
-    fmtster::JSONStyle mStyle;
+    fmtster::JSONStyle mStyleSetting;
 
-    bool mSetDefaultStyle = false;
     int mFormatSetting = 0;     // format (0 = JSON)
 
     int mBraIndentSetting = 0;  // beginning number of brace/bracket indents
@@ -370,6 +507,8 @@ struct FmtsterBase
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
+cout << __LINE__ << " parse() entry" << endl;
+
         // generic handling of N comma-separated parms, including recursive braces
 auto i = ctx.begin();
 cout << "parse(): format string: \"";
@@ -415,6 +554,7 @@ if (mParmData.size() > 2)
 if (mParmData.size() > 3)
     cout << "[3]: \"" << mParmData[3] << "\", " << mParmArgIndex[3] << endl;
 
+cout << __LINE__ << " parse() exit" << endl;
         return it;
     } // parse()
 
@@ -428,13 +568,17 @@ if (mParmData.size() > 3)
     {
         using namespace fmtster::internal;
 
-cout << __LINE__ << endl;
+cout << "decipherParms() entry" << endl;
 
         // ensure vectors are large enough for unchecked processing below
         mParmData.resize(4, "");
         mParmArgIndex.resize(4, 0);
 
+
+
+        //
         // format
+        //
         const size_t FORMAT_PARM_INDEX = 0;
         if (mParmArgIndex[FORMAT_PARM_INDEX])
         {
@@ -465,93 +609,23 @@ cout << __LINE__ << endl;
             mFormatSetting = FormatToInt(mParmData[FORMAT_PARM_INDEX]);
         }
 
-        if (mFormatSetting != 0)
-        {
-            throw fmt::format_error(F("unsupported format"));
-        }
 
 
+        //
         // style
+        //
         const size_t STYLE_PARM_INDEX = 1;
         if (mParmArgIndex[STYLE_PARM_INDEX])
         {
-//             auto tabArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
-//             auto tabSetting = FormatToInt(
-//                 visit_format_arg(
-//                     [](auto value) -> int
-//                     {
-//                         if constexpr (std::is_integral_v<decltype(value)>)
-//                         {
-//                             return value;
-//                         }
-//                         else
-//                         {
-//                             throw fmt::format_error("unsupported nested argument type");
-//                         }
-//                     },
-//                     tabArg)
-//                 );
-
-//             mStyle.tab = (tabSetting > 0)
-//                         ? string(tabSetting, ' ')
-//                         : string(-tabSetting, '\t');
-
-auto styleArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
-auto styleObj = visit_format_arg(
-    [](auto value) -> JSONStyle
-    {
-        // This construct is required because at compile time all
-        //  paths are linked, even though that are not allowed at
-        //  run time, and without this, the return value doens't
-        //  match the function return value in some cases, so the
-        //  compile fails.
-cout << typeid(value).name() << endl;
-
-        if constexpr (std::is_same_v<const char*, decltype(value)>)
-        {
-            throw fmt::format_error("unsupported nested argument type **");
-        }
-        else if constexpr (std::is_same_v<const JSONStyle, decltype(value)>)
-        {
-            return value;
-        }
-        else
-        {
-            throw fmt::format_error("unsupported nested argument type");
-        }
-    },
-    styleArg);
-
-
-        }
-        else if(!mParmData[STYLE_PARM_INDEX].empty())
-        {
-throw fmt::format_error("unsupported style parameter type (must be JSONStyle object)");
-//             int tabSetting = TypeToInt(mParmData[STYLE_PARM_INDEX]);
-//             mStyle.tab = (tabSetting > 0)
-//                         ? string(tabSetting, ' ')
-//                         : string(-tabSetting, '\t');
-
-//             mBraIndent.clear();
-//             auto i = mBraIndentSetting;
-//             while (i--)
-//                 mBraIndent += mStyle.tab;
-
-//             mDataIndent.clear();
-//             i = mDataIndentSetting;
-//             while (i--)
-//                 mDataIndent += mStyle.tab;
-        }
-
-
-        // perm call parms
-        const size_t PER_CALL_PARM_INDEX = 2;
-        if (mParmArgIndex[PER_CALL_PARM_INDEX])
-        {
-            auto barArg = ctx.arg(mParmArgIndex[PER_CALL_PARM_INDEX]);
-            auto braSetting = visit_format_arg(
-                [](auto value) -> int
+            auto styleArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
+            mStyleSetting = visit_format_arg(
+                [](auto value) -> uint64_t
                 {
+                    // This construct is required because at compile time all
+                    //  type paths are linked, even though that are not allowed
+                    //  at run time, and without this, the return value doens't
+                    //  match the function return value in some cases, so the
+                    //  compile fails.
                     if constexpr (std::is_integral_v<decltype(value)>)
                     {
                         return value;
@@ -561,13 +635,63 @@ throw fmt::format_error("unsupported style parameter type (must be JSONStyle obj
                         throw fmt::format_error("unsupported nested argument type");
                     }
                 },
-                barArg);
+                styleArg
+            );
+        }
+        else if(!mParmData[STYLE_PARM_INDEX].empty())
+        {
+            throw fmt::format_error("unsupported style parameter type");
+        }
 
-            mDisableBras = FormatToInt(braSetting);
+
+
+        //
+        // perm call parms
+        //
+        const size_t PER_CALL_PARM_INDEX = 2;
+        string pcpSetting;
+        if (mParmArgIndex[PER_CALL_PARM_INDEX])
+        {
+            auto pcpArg = ctx.arg(mParmArgIndex[PER_CALL_PARM_INDEX]);
+            pcpSetting = visit_format_arg(
+                [](auto value) -> int
+                {
+                    if constexpr (std::conjunction_v<std::is_same<const char*, decltype(value)>,
+                                                     fmtster::internal::is_string<decltype(value)> >)
+                    {
+                        return value;
+                    }
+                    else
+                    {
+                        throw fmt::format_error("unsupported nested argument type");
+                    }
+                },
+                pcpArg);
         }
         else if (!mParmData[PER_CALL_PARM_INDEX].empty())
         {
-            mDisableBras = !!TypeToInt(mParmData[PER_CALL_PARM_INDEX]);
+            pcpSetting = mParmData[PER_CALL_PARM_INDEX];
+        }
+
+        // parse those parms
+        if (!pcpSetting.empty())
+        {
+            bool negate = false;
+            for (const auto c : pcpSetting)
+            {
+                switch (c)
+                {
+                case 'b': mDisableBras = negate; break;
+                case 'f': sDefaultFormat = mFormatSetting; break;
+                case 's': sDefaultStyle = mStyleSetting; break;
+                case '!': mDumpStyle = true; break;
+// @@@ Temporary, for compatibility with existing tests before changing
+case '1': mDisableBras = true; break;
+                default: ;
+                }
+
+                negate = (c == '-');
+            }
         }
 
 
@@ -589,6 +713,7 @@ throw fmt::format_error("unsupported style parameter type (must be JSONStyle obj
                     }
                 },
                 indentArg);
+
             mBraIndentSetting = FormatToInt(indentSetting);
         }
         else if (!mParmData[INDENT_PARM_INDEX].empty())
@@ -606,12 +731,14 @@ cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " <
         mBraIndent.clear();
         auto i = mBraIndentSetting;
         while (i--)
-            mBraIndent += mStyle.tab;
+            mBraIndent += mStyleSetting.tab;
 
         mDataIndent.clear();
         i = mDataIndentSetting;
         while (i--)
-            mDataIndent += mStyle.tab;
+            mDataIndent += mStyleSetting.tab;
+
+cout << "decipherParms() exit" << endl;
     } // decipherParms()
 
     // templated function to provide non-container {fmt} string
@@ -644,14 +771,14 @@ cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " <
     {
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
-mStyle, // mStyle.tab.size(),
-!addBraces ? 1 : 0,
+                           mStyleSetting.value(),
+                           "b-f-s-!",
                            mDataIndentSetting,
                            addComma ? "," : "");
     }
 }; // struct FmtterBase
 
-extern uint FmtsterBase::sDefaultFormat;
+extern unsigned int FmtsterBase::sDefaultFormat;
 extern JSONStyle FmtsterBase::sDefaultStyle;
 
 } // namespace fmtster
@@ -673,9 +800,12 @@ struct fmt::formatter<T,
     {
         using namespace fmtster::internal;
 
+cout << __LINE__ << " format_loop() entry" << endl;
+
         auto itC = c.begin();
         while (itC != c.end())
         {
+cout << __LINE__ << " format_loop()" << endl;
             std::string fmtStr;
 
             if (!mDisableBras || (itC != c.begin()))
@@ -688,10 +818,29 @@ struct fmt::formatter<T,
 
             itC++;
 
-            fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
+fmtStr += "{:{},{},{},{}}";
+if (itC != c.end())
+    fmtStr += ",";
+//             fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
 
-            itOut = fmt::format_to(itOut, fmtStr, fmtster::internal::EscapeJSONString(val));
+//             itOut = fmt::format_to(itOut, fmtStr, fmtster::internal::EscapeJSONString(val));
+cout << __LINE__ << " format_loop()" << endl;
+cout << "fmtStr: \"" << fmtStr << "\"" << endl;
+// cout << "val: \"" << fmtster::internal::EscapeJSONString(val) << "\"" << endl;
+cout << "mFormatSetting: " << mFormatSetting << endl;
+cout << "mStyleSetting.value(): " << mStyleSetting.value() << endl;
+cout << "-f-sb-!" << endl;
+cout << "mDataIndentSetting: " << mDataIndentSetting << endl;
+itOut = fmt::format_to(itOut,
+                       fmtStr,
+                       fmtster::internal::EscapeJSONString(val),
+                       mFormatSetting,
+                       mStyleSetting.value(),
+                       "-f-sb-!",
+                       mDataIndentSetting);
+cout << __LINE__ << " format_loop()" << endl;
         }
+cout << __LINE__ << " format_loop() exit" << endl;
     }
 
     // templated function inner loop function for multimaps
@@ -700,6 +849,8 @@ struct fmt::formatter<T,
         format_loop(const C& c, FCIt_t<FormatContext>& itOut)
     {
         using namespace fmtster::internal;
+
+cout << __LINE__ << " format_loop() entry" << endl;
 
         auto remainingElements = c.size();
         if (c.empty())
@@ -732,12 +883,13 @@ struct fmt::formatter<T,
                                        vals);
             }
         }
+cout << __LINE__ << " format_loop() exit" << endl;
     }
 
     template<typename FormatContext>
     auto format(const T& sc, FormatContext& ctx)
     {
-cout << "format()" << endl;
+cout << __LINE__ << " format() entry" << endl;
         using namespace fmtster::internal;
 
 decipherParms(ctx);
@@ -765,6 +917,7 @@ decipherParms(ctx);
                                        mBraIndent);
         }
 
+cout << __LINE__ << " format() exit" << endl;
         return itOut;
     }
 }; // struct fmt::formatter< containers >
@@ -780,6 +933,7 @@ struct fmt::formatter<A,
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
+cout << __LINE__ << " parse() entry" << endl;
         // get adapter format and forward to internal type
         auto itCtxEnd = std::find(ctx.begin(), ctx.end(), '}');
         mStrFmt = "{" + std::string(ctx.begin(), itCtxEnd) + "}";
@@ -796,6 +950,8 @@ struct fmt::formatter<A,
                 return a.*&hack::c;
             }
         };
+
+cout << __LINE__ << " parse() exit" << endl;
         return hack::Get(a);
     }
 
@@ -849,6 +1005,8 @@ struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
     {
         using namespace fmtster::internal;
 
+cout << __LINE__ << " format() entry" << endl;
+
 decipherParms(ctx);
 
         // output opening bracket (if enabled)
@@ -888,6 +1046,7 @@ decipherParms(ctx);
             }
         }
 
+cout << __LINE__ << " format() exit" << endl;
         return itOut;
     }
 }; // struct fmt::formatter<std::tuple<> >
@@ -900,26 +1059,48 @@ struct fmt::formatter<fmtster::JSONStyle>
     template<typename FormatContext>
     auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
     {
+cout << __LINE__ << " format() entry" << endl;
+
         // @@@ Make this conditional (difficult because it differs from the
         //     behavior of all the other types).
         fmtster::FmtsterBase::sDefaultStyle = style;
 
         auto it = ctx.out();
+cout << __LINE__ << " format()" << endl;
 
-        if (true) // dumpStyle)
+        if (mDumpStyle)
         {
             using namespace std::string_literals;
             using std::make_pair;
 
-            if (!mDisableBras)
+           if (!mDisableBras)
                 it = format_to(it, "{{\n");
 
-            const auto pr = make_pair("tab"s, style.tab);
-            it = format_to(it, createFormatString(pr, mDataIndent, false, false), pr);
+            const auto config = style.cconfig();
+            const auto tup = std::make_tuple(
+                make_pair("cr", config.cr),
+                make_pair("lf", config.lf),
+                make_pair("hardTab", config.hardTab),
+                make_pair("tabCount", config.tabCount),
+                make_pair("gapA", config.gapA),
+                make_pair("gapB", config.gapB),
+                make_pair("gapC", config.gapC),
+                make_pair("gap1", config.gap1),
+                make_pair("gap2", config.gap2),
+                make_pair("gap3", config.gap3),
+                make_pair("gap4", config.gap4),
+                make_pair("gap5", config.gap5),
+                make_pair("gap6", config.gap6),
+                make_pair("gap7", config.gap7),
+                make_pair("emptyArray", config.emptyArray),
+                make_pair("emptyObject", config.emptyObject),
+                make_pair("sva", config.sva),
+                make_pair("svo", config.svo)
+            );
+            it = format_to(it, createFormatString(tup, mDataIndent, false, false), tup);
 
             if (!mDisableBras)
                 it = format_to(it, "\n{}}}", mBraIndent);
-
         }
 
         return it;

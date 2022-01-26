@@ -84,7 +84,7 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
                                         mFormatSetting,
 1,
-mStyle.tab.size(),
+mStyleSetting.tab.size(),
                                         mDataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
@@ -144,6 +144,9 @@ Personnel GetPersonnel()
 
 int main()
 {
+    vector<int> v = { 1 };
+    cout << F("{}", v) << endl;
+
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
@@ -177,7 +180,8 @@ int main()
     cout << "\n\n" << endl;
 
 
-    fmtster::JSONStyle style{ .tab = "\t" };
+    fmtster::JSONStyle style;
+    style.config().tabCount = 4;
     cout << F("style: {}\n\n", style) << endl;
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
     try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }

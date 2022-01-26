@@ -25,7 +25,7 @@ LFLAGS=
 LIBS=-lpthread -lfmt
 TESTLIBS=-lgtest -lgtest_main
 
-all: fmtstertest example-json
+all: fmtstertest example-json JSONStyle_if_no_fmt_custom_nested_args
 
 fmtstertest.o: fmtstertest.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
@@ -38,5 +38,12 @@ example-json.o: example-json.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 example-json: example-json.o
+	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
+	strip $@
+
+JSONStyle_if_no_fmt_custom_nested_args.o: JSONStyle_if_no_fmt_custom_nested_args.cpp fmtster.h Makefile
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+JSONStyle_if_no_fmt_custom_nested_args: JSONStyle_if_no_fmt_custom_nested_args.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
 	strip $@
