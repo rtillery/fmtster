@@ -144,72 +144,75 @@ Personnel GetPersonnel()
 
 int main()
 {
-    vector<int> v = { 1 };
-    cout << F("{}", v) << endl;
+    vector<int> v = { 1, 2 };
+    cout << F("v: {}", v) << endl;
+cout << __LINE__ << endl;
 
-    // Based on https://json.org/example.html
-    auto GlossSeeAlso = vector<string>{ "GML", "XML" };
-    auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
-                       mp("GlossSeeAlso"s, GlossSeeAlso));
-    auto GlossEntry = mt(mp("ID"s, "SGML"s),
-                         mp("SortAs"s, "SGML"s),
-                         mp("GlossTerm"s, "Standard Generalized Markup Language"s),
-                         mp("Acronym"s, "SGML"s),
-                         mp("Abbrev"s, "ISO 8879:1986"s),
-                         mp("GlossDef"s, GlossDef),
-                         mp("GlossSee"s, "markup"s));
-    auto GlossList = mp("GlossEntry"s, GlossEntry);
-    auto GlossDiv = mt(mp("title"s, "S"s),
-                       mp("GlossList"s, GlossList));
-    auto glossary = mt(mp("title"s, "example glossary"s),
-                       mp("GlossDiv"s, GlossDiv));
-    auto obj = mt(mp("glossary"s, glossary));
-    cout << F("{}", obj) << endl;
+    cout << F("v: {:x}", v) << endl;
 
-
-    cout << "\n\n" << endl;
-
-
-    string buildAJSON = "{\n";
-
-    size_t personNumber = 0;
-    for (auto person : GetPersonnel())
-        cout << F("{}:\n{:,1,,1}\n", personNumber++, person) << endl;
+//     // Based on https://json.org/example.html
+//     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
+//     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
+//                        mp("GlossSeeAlso"s, GlossSeeAlso));
+//     auto GlossEntry = mt(mp("ID"s, "SGML"s),
+//                          mp("SortAs"s, "SGML"s),
+//                          mp("GlossTerm"s, "Standard Generalized Markup Language"s),
+//                          mp("Acronym"s, "SGML"s),
+//                          mp("Abbrev"s, "ISO 8879:1986"s),
+//                          mp("GlossDef"s, GlossDef),
+//                          mp("GlossSee"s, "markup"s));
+//     auto GlossList = mp("GlossEntry"s, GlossEntry);
+//     auto GlossDiv = mt(mp("title"s, "S"s),
+//                        mp("GlossList"s, GlossList));
+//     auto glossary = mt(mp("title"s, "example glossary"s),
+//                        mp("GlossDiv"s, GlossDiv));
+//     auto obj = mt(mp("glossary"s, glossary));
+//     cout << F("{}", obj) << endl;
 
 
-    cout << "\n\n" << endl;
+//     cout << "\n\n" << endl;
 
 
-    fmtster::JSONStyle style;
-    style.config().tabCount = 4;
-    cout << F("style: {}\n\n", style) << endl;
-    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     string buildAJSON = "{\n";
 
-    try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     size_t personNumber = 0;
+//     for (auto person : GetPersonnel())
+//         cout << F("{}:\n{:,1,,1}\n", personNumber++, person) << endl;
 
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,8}", msi) << endl;
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,{}}", msi, 8) << endl;
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,{},1,4}", msi, 8) << endl;
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,{},,4}", msi, 8) << endl;
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,{},,{}}", msi, 8, 4) << endl;
-cout << "** " << __LINE__ << endl;
-    cout << F("{:,{},{},{}}", msi, 8, 1, 4) << endl;
-cout << "** " << __LINE__ << endl;
-// not ready for prime time
-//     cout << F("{:{},{},{},{}}", msi, 0, -1, 0, 2) << endl;
+
+//     cout << "\n\n" << endl;
+
+
+//     fmtster::JSONStyle style;
+//     style.config().tabCount = 4;
+//     cout << F("style: {}\n\n", style) << endl;
+//     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+//     try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+//     try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
+//     try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
 // cout << "** " << __LINE__ << endl;
+//     cout << F("{:,8}", msi) << endl;
+// cout << "** " << __LINE__ << endl;
+//     cout << F("{:,{}}", msi, 8) << endl;
+// cout << "** " << __LINE__ << endl;
+//     cout << F("{:,{},1,4}", msi, 8) << endl;
+// cout << "** " << __LINE__ << endl;
+//     cout << F("{:,{},,4}", msi, 8) << endl;
+// cout << "** " << __LINE__ << endl;
+//     cout << F("{:,{},,{}}", msi, 8, 4) << endl;
+// cout << "** " << __LINE__ << endl;
+//     cout << F("{:,{},{},{}}", msi, 8, 1, 4) << endl;
+// cout << "** " << __LINE__ << endl;
+// // not ready for prime time
+// //     cout << F("{:{},{},{},{}}", msi, 0, -1, 0, 2) << endl;
+// // cout << "** " << __LINE__ << endl;
 }

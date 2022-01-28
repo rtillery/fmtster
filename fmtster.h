@@ -21,6 +21,46 @@
  * SOFTWARE.
  */
 
+#define LOGENABLE
+
+#ifdef LOGENABLE
+#include <iostream>
+
+#define LOGPREAMBLE \
+std::cout << "(" << __LINE__ << ") " << __func__ << "()"
+
+#define LOGMID(...) \
+std::cout << fmt::format(__VA_ARGS__)
+
+#define LOGBEGIN(...) \
+LOGPREAMBLE;          \
+LOGMID(__VA_ARGS__)
+
+#define LOGEND(...) \
+LOGMID(__VA_ARGS__) << endl;
+
+#define LOG(...)   \
+LOGPREAMBLE;       \
+LOGMID(": ");      \
+LOGEND(__VA_ARGS__)
+
+#define LOGENTRY  \
+LOGPREAMBLE;      \
+LOGEND(" entry")
+
+#define LOGEXIT   \
+LOGPREAMBLE;      \
+LOGEND(" exit")
+
+#else
+
+#define LOGMID(...)
+#define LOG(...)
+#define LOGENTRY
+#define LOGEND
+
+#endif // !LOGENABLE
+
 #define FMTSTER_VERSION 000400 // 0.4.0
 
 #include <algorithm>
@@ -32,10 +72,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <iostream>
-using std::cout;
-using std::endl;
 
 namespace fmtster
 {
@@ -82,7 +118,8 @@ template<typename, typename...>                                                \
 static auto test_ ## FN(long) -> false_type;                                   \
                                                                                \
 template<typename T, typename... Args>                                         \
-struct has_ ## FN : decltype(test_ ## FN<T, Args...>(0))                       \
+struct has_ ## FN                                                              \
+    : decltype(test_ ## FN<T, Args...>(0))                                     \
 {};                                                                            \
                                                                                \
 template<typename ...Ts>                                                       \
@@ -162,13 +199,16 @@ struct has_operator_index<
 // is_ID<> declarations
 //
 template<typename T, typename = void>
-struct is_string : false_type
+struct is_string
+    : false_type
 {};
 template<class T, class Traits, class Alloc>
-struct is_string<std::basic_string<T, Traits, Alloc>, void> : true_type
+struct is_string<std::basic_string<T, Traits, Alloc>, void>
+    : true_type
 {};
 template<class T, template<typename, typename, typename> class STRING>
-struct is_string<T, STRING<T, std::char_traits<T>, std::allocator<T> > > : true_type
+struct is_string<T, STRING<T, std::char_traits<T>, std::allocator<T> > >
+    : true_type
 {};
 template<typename T>
 inline constexpr bool is_string_v = is_string<T>::value;
@@ -192,20 +232,24 @@ fmtster_MAKEIS(adapter, has_container_type_v<T>);
 
 // specific detection for std::pair<> only
 template<typename T>
-struct is_pair : false_type
+struct is_pair
+    : false_type
 {};
 template<typename T1, typename T2>
-struct is_pair<std::pair<T1, T2> > : true_type
+struct is_pair<std::pair<T1, T2> >
+    : true_type
 {};
 template<typename ...Ts>
 inline constexpr bool is_pair_v = is_pair<Ts...>::value;
 
 // specific detection for std::tuple<>
 template<typename T>
-struct is_tuple : false_type
+struct is_tuple
+    : false_type
 {};
 template<typename... Ts>
-struct is_tuple<std::tuple<Ts...> > : true_type
+struct is_tuple<std::tuple<Ts...> >
+    : true_type
 {};
 template<typename... Ts>
 inline constexpr bool is_tuple_v = is_tuple<Ts...>::value;
@@ -278,53 +322,59 @@ string EscapeJSONString(const string& str)
 } // EscapeJSONString()
 
 template<typename T>
-int TypeToInt(const T&);
-template<>
-int TypeToInt(const string& str)
+T FormatToValue(const char* sz)
 {
-    return stoi(str);
-}
-template<>
-int TypeToInt(const char* const& sz)
-{
-    return ::atoi(sz);
-}
-template<>
-int TypeToInt(const int& i)
-{
-    return i;
-}
-
-int FormatToInt(const char* sz)
-{
-    int format = -1;
+    T format = -1;
     if (sz)
     {
         const auto c0 = *sz;
         if ((c0 == '0') || (c0 == 'j') || (c0 == 'J'))
-        {
             format = 0;
-        }
         else
-        {
             throw fmt::format_error(F("unsupported format parameter: \"{}\"",
                                       EscapeJSONString(string(sz))));
-        }
     }
     return format;
 }
-int FormatToInt(const string& str)
+template<typename T>
+T FormatToValue(const string& str)
 {
-    return FormatToInt(str.c_str());
+    return FormatToValue<T>(str.c_str());
 }
-int FormatToInt(int i)
+template<typename T>
+T FormatToValue(int i)
 {
     if (i != 0)
-    {
         throw fmt::format_error(F("unsupported format parameter: \"{}\"",
                                   i));
-    }
     return i;
+}
+
+template<typename T>
+T ToValue(const char* sz)
+{
+    T val = 0;
+
+    if (sz)
+    {
+        do
+        {
+            const char c = *sz;
+            if ((c > '9') || (c < '0'))
+            {
+                val = 0;
+                break;
+            }
+            val = (val * 10) + (c - '0');
+        } while (*(++sz));
+    }
+
+    return val;
+}
+template<typename T>
+T ToValue(const string& str)
+{
+    return ToValue<T>(str.c_str());
 }
 
 } // namespace internal
@@ -474,12 +524,11 @@ struct FmtsterBase
     static fmtster::JSONStyle sDefaultStyle;
 
     // results of parsing for use in format()
-    vector<string> mParmData = { "" };
-    vector<int> mParmArgIndex = { 0 };
+    vector<string> mArgData = { "" };
+    vector<int> mNestedArgIndex = { 0 };
 
-    fmtster::JSONStyle mStyleSetting;
-
-    int mFormatSetting = 0;     // format (0 = JSON)
+    int mFormatSetting = sDefaultFormat;    // format (0 = JSON)
+    fmtster::JSONStyle mStyleSetting = sDefaultStyle;
 
     int mBraIndentSetting = 0;  // beginning number of brace/bracket indents
     int mDataIndentSetting = 1; // beginning number of data indents
@@ -507,14 +556,14 @@ struct FmtsterBase
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-cout << __LINE__ << " parse() entry" << endl;
+LOGENTRY;
 
         // generic handling of N comma-separated parms, including recursive braces
 auto i = ctx.begin();
-cout << "parse(): format string: \"";
+LOGBEGIN("");
 while (i != ctx.end())
-    cout << *(i++);
-cout << "\"" << endl;
+    LOGMID("{}", *(i++));
+LOGEND("\"");
 
         int parmIndex = 0;
         int braces = 1;
@@ -524,7 +573,7 @@ cout << "\"" << endl;
             const auto c = *it;
             if (c == '{')
             {
-                mParmArgIndex[parmIndex] = ctx.next_arg_id();
+                mNestedArgIndex[parmIndex] = ctx.next_arg_id();
                 braces++;
             }
             else if (c == '}')
@@ -536,25 +585,29 @@ cout << "\"" << endl;
             else if (c == ',')
             {
                 parmIndex++;
-                mParmData.resize(parmIndex + 1);
-                mParmArgIndex.resize(parmIndex + 1);
+                mArgData.resize(parmIndex + 1);
+                mNestedArgIndex.resize(parmIndex + 1);
             }
             else
             {
-                mParmData[parmIndex] += c;
+                mArgData[parmIndex] += c;
             }
             it++;
         }
 
-cout << "[0]: \"" << mParmData[0] << "\", " << mParmArgIndex[0] << endl;
-if (mParmData.size() > 1)
-    cout << "[1]: \"" << mParmData[1] << "\", " << mParmArgIndex[1] << endl;
-if (mParmData.size() > 2)
-    cout << "[2]: \"" << mParmData[2] << "\", " << mParmArgIndex[2] << endl;
-if (mParmData.size() > 3)
-    cout << "[3]: \"" << mParmData[3] << "\", " << mParmArgIndex[3] << endl;
+LOG("[0]: \"{}\", {}", mArgData[0], mNestedArgIndex[0]);
+if (mArgData.size() > 1)
+{
+    LOG("[1]: \"{}\", {}", mArgData[1], mNestedArgIndex[1]);
+    if (mArgData.size() > 2)
+    {
+        LOG("[2]: \"{}\", {}", mArgData[2], mNestedArgIndex[2]);
+        if (mArgData.size() > 3)
+            LOG("[3]: \"{}\", {}", mArgData[3], mNestedArgIndex[3]);
+    }
+}
 
-cout << __LINE__ << " parse() exit" << endl;
+LOGEXIT;
         return it;
     } // parse()
 
@@ -568,11 +621,9 @@ cout << __LINE__ << " parse() exit" << endl;
     {
         using namespace fmtster::internal;
 
-cout << "decipherParms() entry" << endl;
-
         // ensure vectors are large enough for unchecked processing below
-        mParmData.resize(4, "");
-        mParmArgIndex.resize(4, 0);
+        mArgData.resize(4, "");
+        mNestedArgIndex.resize(4, 0);
 
 
 
@@ -580,9 +631,9 @@ cout << "decipherParms() entry" << endl;
         // format
         //
         const size_t FORMAT_PARM_INDEX = 0;
-        if (mParmArgIndex[FORMAT_PARM_INDEX])
+        if (mNestedArgIndex[FORMAT_PARM_INDEX])
         {
-            auto formatArg = ctx.arg(mParmArgIndex[FORMAT_PARM_INDEX]);
+            auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_PARM_INDEX]);
             auto formatSetting = visit_format_arg(
                 [](auto value) -> int
                 {
@@ -600,14 +651,22 @@ cout << "decipherParms() entry" << endl;
                         throw fmt::format_error("unsupported nested argument type");
                     }
                 },
-                formatArg);
+                formatArg
+            );
 
-            mFormatSetting = FormatToInt(formatSetting);
+            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(formatSetting);
+LOG("mFormatSetting (from nested arg): {}", mFormatSetting);
         }
-        else if(!mParmData[FORMAT_PARM_INDEX].empty())
+        else if(!mArgData[FORMAT_PARM_INDEX].empty())
         {
-            mFormatSetting = FormatToInt(mParmData[FORMAT_PARM_INDEX]);
+LOG("mArgData[FORMAT_PARM_INDEX]: {}", mArgData[FORMAT_PARM_INDEX]);
+            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(mArgData[FORMAT_PARM_INDEX]);
+LOG("mFormatSetting (from direct arg): {}", mFormatSetting);
         }
+else
+{
+LOG("default mFormatSetting: {}", mFormatSetting);
+}
 
 
 
@@ -615,10 +674,10 @@ cout << "decipherParms() entry" << endl;
         // style
         //
         const size_t STYLE_PARM_INDEX = 1;
-        if (mParmArgIndex[STYLE_PARM_INDEX])
+        if (mNestedArgIndex[STYLE_PARM_INDEX])
         {
-            auto styleArg = ctx.arg(mParmArgIndex[STYLE_PARM_INDEX]);
-            mStyleSetting = visit_format_arg(
+            auto styleArg = ctx.arg(mNestedArgIndex[STYLE_PARM_INDEX]);
+            mStyleSetting.value() = visit_format_arg(
                 [](auto value) -> uint64_t
                 {
                     // This construct is required because at compile time all
@@ -637,11 +696,20 @@ cout << "decipherParms() entry" << endl;
                 },
                 styleArg
             );
+
+LOG("mStyleSetting.config (from nested arg): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
         }
-        else if(!mParmData[STYLE_PARM_INDEX].empty())
+        else if(!mArgData[STYLE_PARM_INDEX].empty())
         {
-            throw fmt::format_error("unsupported style parameter type");
+LOG("mArgData[STYLE_PARM_INDEX]: {}", mArgData[STYLE_PARM_INDEX]);
+            mStyleSetting.value() =
+                ToValue<uint64_t>(mArgData[STYLE_PARM_INDEX]);
+LOG("mStyleSetting.config (from direct arg): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
         }
+else
+{
+LOG("mStyleSetting.config (default): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
+}
 
 
 
@@ -650,9 +718,9 @@ cout << "decipherParms() entry" << endl;
         //
         const size_t PER_CALL_PARM_INDEX = 2;
         string pcpSetting;
-        if (mParmArgIndex[PER_CALL_PARM_INDEX])
+        if (mNestedArgIndex[PER_CALL_PARM_INDEX])
         {
-            auto pcpArg = ctx.arg(mParmArgIndex[PER_CALL_PARM_INDEX]);
+            auto pcpArg = ctx.arg(mNestedArgIndex[PER_CALL_PARM_INDEX]);
             pcpSetting = visit_format_arg(
                 [](auto value) -> int
                 {
@@ -667,11 +735,19 @@ cout << "decipherParms() entry" << endl;
                     }
                 },
                 pcpArg);
+
+LOG("pcpSetting (from nested arg): {}", pcpSetting);
         }
-        else if (!mParmData[PER_CALL_PARM_INDEX].empty())
+        else if (!mArgData[PER_CALL_PARM_INDEX].empty())
         {
-            pcpSetting = mParmData[PER_CALL_PARM_INDEX];
+LOG("mArgData[PER_CALL_PARM_INDEX]: {}", mArgData[PER_CALL_PARM_INDEX]);
+            pcpSetting = mArgData[PER_CALL_PARM_INDEX];
+LOG("pcpSetting (from direct arg): {}", pcpSetting);
         }
+else
+{
+LOG("pcpSetting (default): {}", pcpSetting);
+}
 
         // parse those parms
         if (!pcpSetting.empty())
@@ -695,11 +771,13 @@ case '1': mDisableBras = true; break;
         }
 
 
+        //
         // indent
+        //
         const size_t INDENT_PARM_INDEX = 3;
-        if (mParmArgIndex[INDENT_PARM_INDEX])
+        if (mNestedArgIndex[INDENT_PARM_INDEX])
         {
-            auto indentArg = ctx.arg(mParmArgIndex[INDENT_PARM_INDEX]);
+            auto indentArg = ctx.arg(mNestedArgIndex[INDENT_PARM_INDEX]);
             auto indentSetting = visit_format_arg(
                 [](auto value) -> int
                 {
@@ -714,11 +792,11 @@ case '1': mDisableBras = true; break;
                 },
                 indentArg);
 
-            mBraIndentSetting = FormatToInt(indentSetting);
+            mBraIndentSetting = FormatToValue<decltype(mBraIndentSetting)>(indentSetting);
         }
-        else if (!mParmData[INDENT_PARM_INDEX].empty())
+        else if (!mArgData[INDENT_PARM_INDEX].empty())
         {
-            mBraIndentSetting = TypeToInt(mParmData[INDENT_PARM_INDEX]);
+            mBraIndentSetting = ToValue<decltype(mBraIndentSetting)>(mArgData[INDENT_PARM_INDEX]);
         }
 
         if (mBraIndentSetting < 0)
@@ -726,7 +804,7 @@ case '1': mDisableBras = true; break;
                                                 mBraIndentSetting));
 
         mDataIndentSetting = mDisableBras ? mBraIndentSetting : mBraIndentSetting + 1;
-cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " << mDataIndentSetting << endl;
+LOG("mBraIndentSetting: {}, mDataIndentSetting: {}", mBraIndentSetting ,mDataIndentSetting);
 
         mBraIndent.clear();
         auto i = mBraIndentSetting;
@@ -738,7 +816,7 @@ cout << "mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " <
         while (i--)
             mDataIndent += mStyleSetting.tab;
 
-cout << "decipherParms() exit" << endl;
+LOG("decipherParms() exit");
     } // decipherParms()
 
     // templated function to provide non-container {fmt} string
@@ -771,8 +849,8 @@ cout << "decipherParms() exit" << endl;
     {
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
-                           mStyleSetting.value(),
-                           "b-f-s-!",
+                           (mStyleSetting.value() == sDefaultStyle.value()) ? 0 : mStyleSetting.value(),
+                           "",
                            mDataIndentSetting,
                            addComma ? "," : "");
     }
@@ -800,12 +878,11 @@ struct fmt::formatter<T,
     {
         using namespace fmtster::internal;
 
-cout << __LINE__ << " format_loop() entry" << endl;
+LOGENTRY;
 
         auto itC = c.begin();
         while (itC != c.end())
         {
-cout << __LINE__ << " format_loop()" << endl;
             std::string fmtStr;
 
             if (!mDisableBras || (itC != c.begin()))
@@ -818,30 +895,35 @@ cout << __LINE__ << " format_loop()" << endl;
 
             itC++;
 
-fmtStr += "{:{},{},{},{}}";
-if (itC != c.end())
-    fmtStr += ",";
+if (!fmtster::internal::is_fmtsterable_v<decltype(val)>)
+    fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
+else
+{
+    fmtStr += "{:{},{},{},{}}";
+    if (itC != c.end())
+        fmtStr += ",";
+}
 //             fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
 
 //             itOut = fmt::format_to(itOut, fmtStr, fmtster::internal::EscapeJSONString(val));
-cout << __LINE__ << " format_loop()" << endl;
-cout << "fmtStr: \"" << fmtStr << "\"" << endl;
-// cout << "val: \"" << fmtster::internal::EscapeJSONString(val) << "\"" << endl;
-cout << "mFormatSetting: " << mFormatSetting << endl;
-cout << "mStyleSetting.value(): " << mStyleSetting.value() << endl;
-cout << "-f-sb-!" << endl;
-cout << "mDataIndentSetting: " << mDataIndentSetting << endl;
+LOG("fmtStr: \"{}\"", fmtStr);
+// LOG("val: \"{}\"", fmtster::internal::EscapeJSONString(val));
+LOG("val type: {}", typeid(val).name());
+LOG("mFormatSetting: {}", mFormatSetting);
+LOG("mStyleSetting.value(): {}", mStyleSetting.value());
+LOG("\"\"");
+LOG("mDataIndentSetting: {}", mDataIndentSetting);
 itOut = fmt::format_to(itOut,
                        fmtStr,
                        fmtster::internal::EscapeJSONString(val),
                        mFormatSetting,
-                       mStyleSetting.value(),
-                       "-f-sb-!",
+                       (mStyleSetting.value() == sDefaultStyle.value()) ? 0 : mStyleSetting.value(),
+                       "",
                        mDataIndentSetting);
-cout << __LINE__ << " format_loop()" << endl;
         }
-cout << __LINE__ << " format_loop() exit" << endl;
-    }
+
+LOGEXIT;
+    } // format_loop() (all containers except multimap)
 
     // templated function inner loop function for multimaps
     template<typename FormatContext, typename C = T>
@@ -850,7 +932,7 @@ cout << __LINE__ << " format_loop() exit" << endl;
     {
         using namespace fmtster::internal;
 
-cout << __LINE__ << " format_loop() entry" << endl;
+LOGENTRY;
 
         auto remainingElements = c.size();
         if (c.empty())
@@ -883,13 +965,15 @@ cout << __LINE__ << " format_loop() entry" << endl;
                                        vals);
             }
         }
-cout << __LINE__ << " format_loop() exit" << endl;
-    }
+
+LOGEXIT;
+    } // format_loop() (multimaps)
 
     template<typename FormatContext>
     auto format(const T& sc, FormatContext& ctx)
     {
-cout << __LINE__ << " format() entry" << endl;
+LOGENTRY;
+
         using namespace fmtster::internal;
 
 decipherParms(ctx);
@@ -917,7 +1001,7 @@ decipherParms(ctx);
                                        mBraIndent);
         }
 
-cout << __LINE__ << " format() exit" << endl;
+LOGEXIT;
         return itOut;
     }
 }; // struct fmt::formatter< containers >
@@ -933,12 +1017,13 @@ struct fmt::formatter<A,
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-cout << __LINE__ << " parse() entry" << endl;
+LOGENTRY;
+
         // get adapter format and forward to internal type
         auto itCtxEnd = std::find(ctx.begin(), ctx.end(), '}');
         mStrFmt = "{" + std::string(ctx.begin(), itCtxEnd) + "}";
         return itCtxEnd;
-    }
+    } // parse()
 
     template <class ADAPTER>
     static typename ADAPTER::container_type const& GetAdapterContainer(ADAPTER &a)
@@ -951,9 +1036,9 @@ cout << __LINE__ << " parse() entry" << endl;
             }
         };
 
-cout << __LINE__ << " parse() exit" << endl;
+LOGEXIT;
         return hack::Get(a);
-    }
+    } // GetAdapterContainer()
 
     template<typename FormatContext>
     auto format(const A& ac, FormatContext& ctx)
@@ -964,7 +1049,8 @@ cout << __LINE__ << " parse() exit" << endl;
 
 // fmt::formatter<> for std::pair<>
 template<typename T1, typename T2>
-struct fmt::formatter<std::pair<T1, T2> > : fmtster::FmtsterBase
+struct fmt::formatter<std::pair<T1, T2> >
+    : fmtster::FmtsterBase
 {
     // create format string
     std::string createPairFormatString(const T1& v1, const T2& v2)
@@ -998,14 +1084,15 @@ decipherParms(ctx);
 
 // fmt::formatter<> for std::tuple<> (wraps group of heterogeneous objects known at compile time)
 template<typename... Ts>
-struct fmt::formatter<std::tuple<Ts...> > : fmtster::FmtsterBase
+struct fmt::formatter<std::tuple<Ts...> >
+    : fmtster::FmtsterBase
 {
     template<typename FormatContext>
     auto format(const std::tuple<Ts...>& tup, FormatContext& ctx)
     {
-        using namespace fmtster::internal;
+LOGENTRY;
 
-cout << __LINE__ << " format() entry" << endl;
+        using namespace fmtster::internal;
 
 decipherParms(ctx);
 
@@ -1046,7 +1133,7 @@ decipherParms(ctx);
             }
         }
 
-cout << __LINE__ << " format() exit" << endl;
+LOGEXIT;
         return itOut;
     }
 }; // struct fmt::formatter<std::tuple<> >
@@ -1059,14 +1146,13 @@ struct fmt::formatter<fmtster::JSONStyle>
     template<typename FormatContext>
     auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
     {
-cout << __LINE__ << " format() entry" << endl;
+LOGENTRY;
 
         // @@@ Make this conditional (difficult because it differs from the
         //     behavior of all the other types).
         fmtster::FmtsterBase::sDefaultStyle = style;
 
         auto it = ctx.out();
-cout << __LINE__ << " format()" << endl;
 
         if (mDumpStyle)
         {
@@ -1077,27 +1163,45 @@ cout << __LINE__ << " format()" << endl;
                 it = format_to(it, "{{\n");
 
             const auto config = style.cconfig();
-            const auto tup = std::make_tuple(
-                make_pair("cr", config.cr),
-                make_pair("lf", config.lf),
-                make_pair("hardTab", config.hardTab),
-                make_pair("tabCount", config.tabCount),
-                make_pair("gapA", config.gapA),
-                make_pair("gapB", config.gapB),
-                make_pair("gapC", config.gapC),
-                make_pair("gap1", config.gap1),
-                make_pair("gap2", config.gap2),
-                make_pair("gap3", config.gap3),
-                make_pair("gap4", config.gap4),
-                make_pair("gap5", config.gap5),
-                make_pair("gap6", config.gap6),
-                make_pair("gap7", config.gap7),
-                make_pair("emptyArray", config.emptyArray),
-                make_pair("emptyObject", config.emptyObject),
-                make_pair("sva", config.sva),
-                make_pair("svo", config.svo)
-            );
-            it = format_to(it, createFormatString(tup, mDataIndent, false, false), tup);
+//             const auto tup = std::make_tuple(
+//                 make_pair("cr", config.cr),
+//                 make_pair("lf", config.lf),
+//                 make_pair("hardTab", config.hardTab),
+//                 make_pair("tabCount", config.tabCount),
+//                 make_pair("gapA", config.gapA),
+//                 make_pair("gapB", config.gapB),
+//                 make_pair("gapC", config.gapC),
+//                 make_pair("gap1", config.gap1),
+//                 make_pair("gap2", config.gap2),
+//                 make_pair("gap3", config.gap3),
+//                 make_pair("gap4", config.gap4),
+//                 make_pair("gap5", config.gap5),
+//                 make_pair("gap6", config.gap6),
+//                 make_pair("gap7", config.gap7),
+//                 make_pair("emptyArray", config.emptyArray),
+//                 make_pair("emptyObject", config.emptyObject),
+//                 make_pair("sva", config.sva),
+//                 make_pair("svo", config.svo)
+//             );
+//             it = format_to(it, createFormatString(tup, mDataIndent, false, false), tup);
+it = format_to(it, "  \"cr\" : {},", config.cr);
+it = format_to(it, "  \"lf\" : {},", config.lf);
+it = format_to(it, "  \"hardTab\" : {},", config.hardTab);
+it = format_to(it, "  \"tabCount\" : {},", config.tabCount);
+it = format_to(it, "  \"gapA\" : {:04b},", config.gapA);
+it = format_to(it, "  \"gapB\" : {:04b},", config.gapB);
+it = format_to(it, "  \"gapC\" : {:04b},", config.gapC);
+it = format_to(it, "  \"gap1\" : {:04b},", config.gap1);
+it = format_to(it, "  \"gap2\" : {:04b},", config.gap2);
+it = format_to(it, "  \"gap3\" : {:04b},", config.gap3);
+it = format_to(it, "  \"gap4\" : {:04b},", config.gap4);
+it = format_to(it, "  \"gap5\" : {:04b},", config.gap5);
+it = format_to(it, "  \"gap6\" : {:04b},", config.gap6);
+it = format_to(it, "  \"gap7\" : {:04b},", config.gap7);
+it = format_to(it, "  \"emptyArray\" : {:02b},", config.emptyArray);
+it = format_to(it, "  \"emptyObject\" : {:02b},", config.emptyObject);
+it = format_to(it, "  \"sva\" : {:02b},", config.sva);
+it = format_to(it, "  \"svo\" : {:02b}", config.svo);
 
             if (!mDisableBras)
                 it = format_to(it, "\n{}}}", mBraIndent);
