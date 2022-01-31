@@ -145,10 +145,18 @@ Personnel GetPersonnel()
 int main()
 {
     vector<int> v = { 1, 2 };
-    cout << F("v: {}", v) << endl;
-cout << __LINE__ << endl;
+//     cout << F("blanks: {}", v) << endl;
+// cout << __LINE__ << endl;
 
-    cout << F("v: {:x}", v) << endl;
+//     cout << F("explicit default style as direct number: {:,0}", v) << endl;
+
+fmtster::JSONStyle style;
+style.config().tabCount = -1;
+    cout << F("8 char tabs: {:,{}}", v, style.value()) << endl;
+
+//     cout << F("braceless: {:,,-b}", v) << endl;
+
+//     cout << F("Indent 2 units: {:,,,2}", v) << endl;
 
 //     // Based on https://json.org/example.html
 //     auto GlossSeeAlso = vector<string>{ "GML", "XML" };

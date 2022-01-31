@@ -416,7 +416,7 @@ public:
         bool lf : 1;
 
         bool hardTab : 1;
-        unsigned int tabCount : 4;
+        int tabCount : 4;
 
         // [ <gap A> value, <gap B> value <gap C> ]
         unsigned int gapA : 4;
@@ -443,6 +443,14 @@ public:
         JSONStyleConfig vConfig;
         uint64_t vValue;
     };
+
+    static_assert(sizeof(uint64_t) == (64 / 8));
+    static_assert(sizeof(JSONStyleConfig) <= sizeof(uint64_t));
+    static_assert(sizeof(JSONStyleUnion) == sizeof(uint64_t));
+
+//     char (*__kaboom)[sizeof(uint64_t)] = 1;
+//     char (*__kaboom)[sizeof(JSONStyleConfig)] = 1;
+//     char (*__kaboom)[sizeof(JSONStyleUnion)] = 1;
 
     static constexpr JSONStyleUnion DEFAULTCONFIG =
     {
@@ -507,14 +515,6 @@ public:
     {
         return mStyle.vConfig;
     }
-
-    static_assert(sizeof(uint64_t) == (64 / 8));
-    static_assert(sizeof(JSONStyleConfig) <= sizeof(uint64_t));
-    static_assert(sizeof(JSONStyleUnion) == sizeof(uint64_t));
-
-//     char (*__kaboom)[sizeof(uint64_t)] = 1;
-//     char (*__kaboom)[sizeof(JSONStyleConfig)] = 1;
-//     char (*__kaboom)[sizeof(JSONStyleUnion)] = 1;
 };
 
 // base class that handles formatting
@@ -697,7 +697,7 @@ LOG("default mFormatSetting: {}", mFormatSetting);
                 styleArg
             );
 
-LOG("mStyleSetting.config (from nested arg): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
+LOG("mStyleSetting.config (from nested arg): {:,,!},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
         }
         else if(!mArgData[STYLE_PARM_INDEX].empty())
         {
@@ -710,6 +710,13 @@ else
 {
 LOG("mStyleSetting.config (default): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
 }
+
+        // use the style setting
+        const auto tabSetting = mStyleSetting.config().tabCount;
+        mStyleSetting.tab = (tabSetting > 0)
+                            ? string(tabSetting, ' ')
+                            : string(-tabSetting, '\t');
+
 
 
 
