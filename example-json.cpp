@@ -84,7 +84,7 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
                                         mFormatSetting,
 1,
-mStyleSetting.tab.size(),
+mStyleHelper.tab.size(),
                                         mDataIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
@@ -151,8 +151,8 @@ int main()
 //     cout << F("explicit default style as direct number: {:,0}", v) << endl;
 
 fmtster::JSONStyle style;
-style.config().tabCount = -1;
-    cout << F("8 char tabs: {:,{}}", v, style.value()) << endl;
+style.tabCount = 8;
+    cout << F("8 char tabs: {:,{}}", v, style.value) << endl;
 
 //     cout << F("braceless: {:,,-b}", v) << endl;
 

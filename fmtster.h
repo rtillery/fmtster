@@ -379,44 +379,43 @@ T ToValue(const string& str)
 
 } // namespace internal
 
-// JSON style class
-class JSONStyle
+enum JSS
 {
-public:
-    string tab = "  ";         // expanded tab
+    BLANK               = 0x0,  // gap
+    STYLE = BLANK,              // empty arrays/objs,
+                                // single value arrays/objs
+    reserved_1          = 0x1,  // gap
+    NOSPACE = reserved_1,       // empty arrays/objs
+    SAMELINE = reserved_1,      // single value arrays/objs
+    SPACE               = 0x2,  // gap
+    // SPACE = SPACE            // empty arrays/objs
+    SPACEx2             = 0x3,  // gap
+    reserved_4          = 0x4,  // gap
+    reserved_5          = 0x5,  // gap
+    TAB                 = 0x6,  // gap
+    TABx2               = 0x7,  // gap
+    NEWLINE             = 0x8,  // gap
+    reserved_9          = 0x9,  // gap
+    NEWLINE_SPACE       = 0xA,  // gap
+    NEWLINE_SPACEx2     = 0xB,  // gap
+    reserved_C          = 0xC,  // gap
+    reserved_D          = 0xD,  // gap
+    NEWLINE_TAB         = 0xE,  // gap
+    NEWLINE_TABx2       = 0xF   // gap
+}; // enum JSS
 
-    enum STYLEDEFS
-    {
-        BLANK               = 0x0,  // gap
-        STYLE = BLANK,              // empty arrays/objs,
-                                    // single value arrays/objs
-        reserved_1          = 0x1,  // gap
-        NOSPACE = reserved_1,       // empty arrays/objs
-        SAMELINE = reserved_1,      // single value arrays/objs
-        SPACE               = 0x2,  // gap
-        // SPACE = SPACE            // empty arrays/objs
-        SPACEx2             = 0x3,  // gap
-        reserved_4          = 0x4,  // gap
-        reserved_5          = 0x5,  // gap
-        TAB                 = 0x6,  // gap
-        TABx2               = 0x7,  // gap
-        NEWLINE             = 0x8,  // gap
-        reserved_9          = 0x9,  // gap
-        NEWLINE_SPACE       = 0xA,  // gap
-        NEWLINE_SPACEx2     = 0xB,  // gap
-        reserved_C          = 0xC,  // gap
-        reserved_D          = 0xD,  // gap
-        NEWLINE_TAB         = 0xE,  // gap
-        NEWLINE_TABx2       = 0xF   // gap
-    };
+namespace internal
+{
 
-    struct JSONStyleConfig
+union ForwardJSONStyle
+{
+    struct
     {
         bool cr : 1;
         bool lf : 1;
 
         bool hardTab : 1;
-        int tabCount : 4;
+        unsigned int tabCount : 4;
 
         // [ <gap A> value, <gap B> value <gap C> ]
         unsigned int gapA : 4;
@@ -437,102 +436,153 @@ public:
         unsigned int sva : 2;
         unsigned int svo : 2;
     };
+    uint64_t value;
+};
 
-    union JSONStyleUnion
+} // namespace internal
+
+constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
+{
     {
-        JSONStyleConfig vConfig;
-        uint64_t vValue;
-    };
-
-    static_assert(sizeof(uint64_t) == (64 / 8));
-    static_assert(sizeof(JSONStyleConfig) <= sizeof(uint64_t));
-    static_assert(sizeof(JSONStyleUnion) == sizeof(uint64_t));
-
-//     char (*__kaboom)[sizeof(uint64_t)] = 1;
-//     char (*__kaboom)[sizeof(JSONStyleConfig)] = 1;
-//     char (*__kaboom)[sizeof(JSONStyleUnion)] = 1;
-
-    static constexpr JSONStyleUnion DEFAULTCONFIG =
-    {
-        .vConfig =
-        {
 #ifdef _WIN32
-            .cr = true,
-            .lf = true,
+        .cr = true,
+        .lf = true,
 #elif defined macintosh
-            .cr = true,
-            .lf = false,
+        .cr = true,
+        .lf = false,
 #else
-            .cr = false,
-            .lf = true,
+        .cr = false,
+        .lf = true,
 #endif
 
-            .hardTab = false,
-            .tabCount = 2,
+        .hardTab = false,
+        .tabCount = 2,
 
-            .gapA = NEWLINE_TAB,
-            .gapB = SPACE,
-            .gapC = SPACE,
+        .gapA = JSS::NEWLINE_TAB,
+        .gapB = JSS::SPACE,
+        .gapC = JSS::SPACE,
 
-            .gap1 = NEWLINE_TAB,
-            .gap2 = BLANK,
-            .gap3 = SPACE,
-            .gap4 = NEWLINE_TAB,
-            .gap5 = BLANK,
-            .gap6 = SPACE,
-            .gap7 = NEWLINE,
+        .gap1 = JSS::NEWLINE_TAB,
+        .gap2 = JSS::BLANK,
+        .gap3 = JSS::SPACE,
+        .gap4 = JSS::NEWLINE_TAB,
+        .gap5 = JSS::BLANK,
+        .gap6 = JSS::SPACE,
+        .gap7 = JSS::NEWLINE,
 
-            .emptyArray = SPACE,
-            .emptyObject = SPACE,
-            .sva = SAMELINE,
-            .svo = SAMELINE,
-        } // .vStyle
-    };
-
-    JSONStyleUnion mStyle;
-
-    JSONStyle(uint64_t value = DEFAULTCONFIG.vValue)
-    {
-        if (value)
-            mStyle.vValue = value;
-        else
-            mStyle.vValue = DEFAULTCONFIG.vValue;
-    }
-
-    uint64_t& value()
-    {
-        return mStyle.vValue;
-    }
-    const uint64_t& cvalue() const
-    {
-        return mStyle.vValue;
-    }
-    JSONStyleConfig& config()
-    {
-        return mStyle.vConfig;
-    }
-    const JSONStyleConfig& cconfig() const
-    {
-        return mStyle.vConfig;
+        .emptyArray = JSS::SPACE,
+        .emptyObject = JSS::SPACE,
+        .sva = JSS::SAMELINE,
+        .svo = JSS::SAMELINE
     }
 };
+
+union JSONStyle
+{
+public:
+    struct
+    {
+        bool cr : 1;
+        bool lf : 1;
+
+        bool hardTab : 1;
+        unsigned int tabCount : 4;
+
+        // [ <gap A> value, <gap B> value <gap C> ]
+        unsigned int gapA : 4;
+        unsigned int gapB : 4;
+        unsigned int gapC : 4;
+
+        // { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> }
+        unsigned int gap1 : 4;
+        unsigned int gap2 : 4;
+        unsigned int gap3 : 4;
+        unsigned int gap4 : 4;
+        unsigned int gap5 : 4;
+        unsigned int gap6 : 4;
+        unsigned int gap7 : 4;
+
+        unsigned int emptyArray : 2;
+        unsigned int emptyObject : 2;
+        unsigned int sva : 2;
+        unsigned int svo : 2;
+    };
+    uint64_t value;
+
+    JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value) : value(val)
+    {}
+};
+
+static_assert(sizeof(uint64_t) == (64 / 8));
+// char (*__kaboom)[sizeof(uint64_t)] = 1;
+
+static_assert(sizeof(JSONStyle) <= sizeof(uint64_t));
+// char (*__kaboom)[sizeof(JSONStyle)] = 1;
+
+namespace internal
+{
+
+class JSONStyleHelper
+{
+public:
+    string tab = "  ";  // expanded tab
+
+    JSONStyle mStyle;
+
+    void updateExpansions()
+    {        
+        tab = mStyle.hardTab
+              ? string(mStyle.tabCount, '\t')
+              : string(mStyle.tabCount, ' ');
+    }
+
+    JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
+    {
+        if (!value)
+            value = DEFAULTJSONCONFIG.value;
+
+        mStyle.value = value;
+        updateExpansions();
+    }
+
+    JSONStyleHelper operator=(uint64_t value)
+    {
+        mStyle.value = value;
+        updateExpansions();
+        return *this;
+    }
+
+    JSONStyleHelper operator=(const JSONStyle& style)
+    {
+        mStyle.value = style.value;
+        updateExpansions();
+        return *this;
+    }
+};
+
+} // namespace internal
 
 // base class that handles formatting
 struct FmtsterBase
 {
     static unsigned int sDefaultFormat;
-    static fmtster::JSONStyle sDefaultStyle;
+    static internal::JSONStyleHelper sDefaultStyleHelper;
 
     // results of parsing for use in format()
     vector<string> mArgData = { "" };
     vector<int> mNestedArgIndex = { 0 };
 
+    // from format arg
     int mFormatSetting = sDefaultFormat;    // format (0 = JSON)
-    fmtster::JSONStyle mStyleSetting = sDefaultStyle;
 
+    // from style arg
+    internal::JSONStyleHelper mStyleHelper = sDefaultStyleHelper.mStyle.value;
+
+    // from indent
     int mBraIndentSetting = 0;  // beginning number of brace/bracket indents
     int mDataIndentSetting = 1; // beginning number of data indents
 
+    // from per call parms
     bool mDisableBras = false;
     bool mDumpStyle = false;
 
@@ -673,11 +723,14 @@ LOG("default mFormatSetting: {}", mFormatSetting);
         //
         // style
         //
+        string styleOrigin;
         const size_t STYLE_PARM_INDEX = 1;
         if (mNestedArgIndex[STYLE_PARM_INDEX])
         {
+styleOrigin = "from nested arg";
+
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_PARM_INDEX]);
-            mStyleSetting.value() = visit_format_arg(
+            auto styleSetting = visit_format_arg(
                 [](auto value) -> uint64_t
                 {
                     // This construct is required because at compile time all
@@ -696,26 +749,24 @@ LOG("default mFormatSetting: {}", mFormatSetting);
                 },
                 styleArg
             );
+            mStyleHelper = internal::JSONStyleHelper(styleSetting);
 
-LOG("mStyleSetting.config (from nested arg): {:,,!},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
         }
         else if(!mArgData[STYLE_PARM_INDEX].empty())
         {
+            styleOrigin = "from direct arg";
+
 LOG("mArgData[STYLE_PARM_INDEX]: {}", mArgData[STYLE_PARM_INDEX]);
-            mStyleSetting.value() =
+            auto styleSetting = 
                 ToValue<uint64_t>(mArgData[STYLE_PARM_INDEX]);
-LOG("mStyleSetting.config (from direct arg): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
+            mStyleHelper = internal::JSONStyleHelper(styleSetting);
         }
 else
 {
-LOG("mStyleSetting.config (default): {},\nmStyleSetting.value: {}", mStyleSetting, mStyleSetting.value());
+styleOrigin = "default";
 }
-
-        // use the style setting
-        const auto tabSetting = mStyleSetting.config().tabCount;
-        mStyleSetting.tab = (tabSetting > 0)
-                            ? string(tabSetting, ' ')
-                            : string(-tabSetting, '\t');
+LOG("mStyleHelper.mStyle ({}): {:,,!},\nmStyleHelper.mStyle.value: {}",
+    styleOrigin, mStyleHelper.mStyle, mStyleHelper.mStyle.value);
 
 
 
@@ -766,7 +817,7 @@ LOG("pcpSetting (default): {}", pcpSetting);
                 {
                 case 'b': mDisableBras = negate; break;
                 case 'f': sDefaultFormat = mFormatSetting; break;
-                case 's': sDefaultStyle = mStyleSetting; break;
+                case 's': sDefaultStyleHelper = mStyleHelper; break;
                 case '!': mDumpStyle = true; break;
 // @@@ Temporary, for compatibility with existing tests before changing
 case '1': mDisableBras = true; break;
@@ -816,12 +867,12 @@ LOG("mBraIndentSetting: {}, mDataIndentSetting: {}", mBraIndentSetting ,mDataInd
         mBraIndent.clear();
         auto i = mBraIndentSetting;
         while (i--)
-            mBraIndent += mStyleSetting.tab;
+            mBraIndent += mStyleHelper.tab;
 
         mDataIndent.clear();
         i = mDataIndentSetting;
         while (i--)
-            mDataIndent += mStyleSetting.tab;
+            mDataIndent += mStyleHelper.tab;
 
 LOG("decipherParms() exit");
     } // decipherParms()
@@ -856,7 +907,8 @@ LOG("decipherParms() exit");
     {
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
-                           (mStyleSetting.value() == sDefaultStyle.value()) ? 0 : mStyleSetting.value(),
+                           (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value)
+                           ? 0 : mStyleHelper.mStyle.value,
                            "",
                            mDataIndentSetting,
                            addComma ? "," : "");
@@ -864,7 +916,7 @@ LOG("decipherParms() exit");
 }; // struct FmtterBase
 
 extern unsigned int FmtsterBase::sDefaultFormat;
-extern JSONStyle FmtsterBase::sDefaultStyle;
+extern internal::JSONStyleHelper FmtsterBase::sDefaultStyleHelper;
 
 } // namespace fmtster
 
@@ -917,14 +969,16 @@ LOG("fmtStr: \"{}\"", fmtStr);
 // LOG("val: \"{}\"", fmtster::internal::EscapeJSONString(val));
 LOG("val type: {}", typeid(val).name());
 LOG("mFormatSetting: {}", mFormatSetting);
-LOG("mStyleSetting.value(): {}", mStyleSetting.value());
+LOG("mStyleHelper.mStyle.value(: {}", mStyleHelper.mStyle.value);
 LOG("\"\"");
 LOG("mDataIndentSetting: {}", mDataIndentSetting);
 itOut = fmt::format_to(itOut,
                        fmtStr,
                        fmtster::internal::EscapeJSONString(val),
                        mFormatSetting,
-                       (mStyleSetting.value() == sDefaultStyle.value()) ? 0 : mStyleSetting.value(),
+                       (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value)
+                       ? 0
+                           : mStyleHelper.mStyle.value,
                        "",
                        mDataIndentSetting);
         }
@@ -1157,7 +1211,7 @@ LOGENTRY;
 
         // @@@ Make this conditional (difficult because it differs from the
         //     behavior of all the other types).
-        fmtster::FmtsterBase::sDefaultStyle = style;
+        fmtster::FmtsterBase::sDefaultStyleHelper = style;
 
         auto it = ctx.out();
 
@@ -1169,46 +1223,45 @@ LOGENTRY;
            if (!mDisableBras)
                 it = format_to(it, "{{\n");
 
-            const auto config = style.cconfig();
 //             const auto tup = std::make_tuple(
-//                 make_pair("cr", config.cr),
-//                 make_pair("lf", config.lf),
-//                 make_pair("hardTab", config.hardTab),
-//                 make_pair("tabCount", config.tabCount),
-//                 make_pair("gapA", config.gapA),
-//                 make_pair("gapB", config.gapB),
-//                 make_pair("gapC", config.gapC),
-//                 make_pair("gap1", config.gap1),
-//                 make_pair("gap2", config.gap2),
-//                 make_pair("gap3", config.gap3),
-//                 make_pair("gap4", config.gap4),
-//                 make_pair("gap5", config.gap5),
-//                 make_pair("gap6", config.gap6),
-//                 make_pair("gap7", config.gap7),
-//                 make_pair("emptyArray", config.emptyArray),
-//                 make_pair("emptyObject", config.emptyObject),
-//                 make_pair("sva", config.sva),
-//                 make_pair("svo", config.svo)
+//                 make_pair("cr", style.cr),
+//                 make_pair("lf", style.lf),
+//                 make_pair("hardTab", style.hardTab),
+//                 make_pair("tabCount", style.tabCount),
+//                 make_pair("gapA", style.gapA),
+//                 make_pair("gapB", style.gapB),
+//                 make_pair("gapC", style.gapC),
+//                 make_pair("gap1", style.gap1),
+//                 make_pair("gap2", style.gap2),
+//                 make_pair("gap3", style.gap3),
+//                 make_pair("gap4", style.gap4),
+//                 make_pair("gap5", style.gap5),
+//                 make_pair("gap6", style.gap6),
+//                 make_pair("gap7", style.gap7),
+//                 make_pair("emptyArray", style.emptyArray),
+//                 make_pair("emptyObject", style.emptyObject),
+//                 make_pair("sva", style.sva),
+//                 make_pair("svo", style.svo)
 //             );
 //             it = format_to(it, createFormatString(tup, mDataIndent, false, false), tup);
-it = format_to(it, "  \"cr\" : {},", config.cr);
-it = format_to(it, "  \"lf\" : {},", config.lf);
-it = format_to(it, "  \"hardTab\" : {},", config.hardTab);
-it = format_to(it, "  \"tabCount\" : {},", config.tabCount);
-it = format_to(it, "  \"gapA\" : {:04b},", config.gapA);
-it = format_to(it, "  \"gapB\" : {:04b},", config.gapB);
-it = format_to(it, "  \"gapC\" : {:04b},", config.gapC);
-it = format_to(it, "  \"gap1\" : {:04b},", config.gap1);
-it = format_to(it, "  \"gap2\" : {:04b},", config.gap2);
-it = format_to(it, "  \"gap3\" : {:04b},", config.gap3);
-it = format_to(it, "  \"gap4\" : {:04b},", config.gap4);
-it = format_to(it, "  \"gap5\" : {:04b},", config.gap5);
-it = format_to(it, "  \"gap6\" : {:04b},", config.gap6);
-it = format_to(it, "  \"gap7\" : {:04b},", config.gap7);
-it = format_to(it, "  \"emptyArray\" : {:02b},", config.emptyArray);
-it = format_to(it, "  \"emptyObject\" : {:02b},", config.emptyObject);
-it = format_to(it, "  \"sva\" : {:02b},", config.sva);
-it = format_to(it, "  \"svo\" : {:02b}", config.svo);
+it = format_to(it, "  \"cr\" : {},", style.cr);
+it = format_to(it, "  \"lf\" : {},", style.lf);
+it = format_to(it, "  \"hardTab\" : {},", style.hardTab);
+it = format_to(it, "  \"tabCount\" : {},", style.tabCount);
+it = format_to(it, "  \"gapA\" : {:04b},", style.gapA);
+it = format_to(it, "  \"gapB\" : {:04b},", style.gapB);
+it = format_to(it, "  \"gapC\" : {:04b},", style.gapC);
+it = format_to(it, "  \"gap1\" : {:04b},", style.gap1);
+it = format_to(it, "  \"gap2\" : {:04b},", style.gap2);
+it = format_to(it, "  \"gap3\" : {:04b},", style.gap3);
+it = format_to(it, "  \"gap4\" : {:04b},", style.gap4);
+it = format_to(it, "  \"gap5\" : {:04b},", style.gap5);
+it = format_to(it, "  \"gap6\" : {:04b},", style.gap6);
+it = format_to(it, "  \"gap7\" : {:04b},", style.gap7);
+it = format_to(it, "  \"emptyArray\" : {:02b},", style.emptyArray);
+it = format_to(it, "  \"emptyObject\" : {:02b},", style.emptyObject);
+it = format_to(it, "  \"sva\" : {:02b},", style.sva);
+it = format_to(it, "  \"svo\" : {:02b}", style.svo);
 
             if (!mDisableBras)
                 it = format_to(it, "\n{}}}", mBraIndent);
