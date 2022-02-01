@@ -103,7 +103,7 @@ namespace internal
 
 template<typename>
 struct fmtster_true
-    : true_type
+  : true_type
 {};
 
 //
@@ -119,7 +119,7 @@ static auto test_ ## FN(long) -> false_type;                                   \
                                                                                \
 template<typename T, typename... Args>                                         \
 struct has_ ## FN                                                              \
-    : decltype(test_ ## FN<T, Args...>(0))                                     \
+  : decltype(test_ ## FN<T, Args...>(0))                                       \
 {};                                                                            \
                                                                                \
 template<typename ...Ts>                                                       \
@@ -131,12 +131,12 @@ inline constexpr bool has_ ## FN ## _v = has_ ## FN<Ts...>::value
 #define fmtster_MAKEHASTYPE(TYPE)                                              \
 template<typename T, typename = void>                                          \
 struct has_ ## TYPE                                                            \
-    : false_type                                                               \
+  : false_type                                                                 \
 {};                                                                            \
                                                                                \
 template<typename T>                                                           \
 struct has_ ## TYPE<T, void_t<typename T::TYPE> >                              \
-    : true_type                                                                \
+  : true_type                                                                  \
 {};                                                                            \
                                                                                \
 template<typename ...Ts>                                                       \
@@ -157,12 +157,12 @@ inline constexpr bool has_ ## TYPE ## _v = has_ ## TYPE<Ts...>::value
 #define fmtster_MAKEIS(ID, COND)                                               \
 template<typename T, typename = void>                                          \
 struct is_ ## ID                                                               \
-    : false_type                                                               \
+  : false_type                                                                 \
 {};                                                                            \
                                                                                \
 template<typename T>                                                           \
 struct is_ ## ID<T, enable_if_t<COND> >                                        \
-    : true_type                                                                \
+  : true_type                                                                  \
 {};                                                                            \
                                                                                \
 template<typename ...Ts>                                                       \
@@ -186,13 +186,13 @@ fmtster_MAKEHASFN(at);
 // functional equivalent for fmtster_MAKEHASFN(operator[])
 template<typename T, typename U = void>
 struct has_operator_index
-    : false_type
+  : false_type
 {};
 template<typename T>
 struct has_operator_index<
     T,
     void_t<decltype(declval<T&>()[declval<const typename T::key_type&>()])> >
-    : true_type
+  : true_type
 {};
 
 //
@@ -200,15 +200,15 @@ struct has_operator_index<
 //
 template<typename T, typename = void>
 struct is_string
-    : false_type
+  : false_type
 {};
 template<class T, class Traits, class Alloc>
 struct is_string<std::basic_string<T, Traits, Alloc>, void>
-    : true_type
+  : true_type
 {};
 template<class T, template<typename, typename, typename> class STRING>
 struct is_string<T, STRING<T, std::char_traits<T>, std::allocator<T> > >
-    : true_type
+  : true_type
 {};
 template<typename T>
 inline constexpr bool is_string_v = is_string<T>::value;
@@ -218,7 +218,7 @@ fmtster_MAKEIS(container,
 // overriding specialization for std::string, which is not considered a container by fmtster
 template<>
 struct is_container<string>
-    : false_type
+  : false_type
 {};
 
 fmtster_MAKEIS(mappish, (conjunction_v<has_key_type<T>,
@@ -233,11 +233,11 @@ fmtster_MAKEIS(adapter, has_container_type_v<T>);
 // specific detection for std::pair<> only
 template<typename T>
 struct is_pair
-    : false_type
+  : false_type
 {};
 template<typename T1, typename T2>
 struct is_pair<std::pair<T1, T2> >
-    : true_type
+  : true_type
 {};
 template<typename ...Ts>
 inline constexpr bool is_pair_v = is_pair<Ts...>::value;
@@ -245,11 +245,11 @@ inline constexpr bool is_pair_v = is_pair<Ts...>::value;
 // specific detection for std::tuple<>
 template<typename T>
 struct is_tuple
-    : false_type
+  : false_type
 {};
 template<typename... Ts>
 struct is_tuple<std::tuple<Ts...> >
-    : true_type
+  : true_type
 {};
 template<typename... Ts>
 inline constexpr bool is_tuple_v = is_tuple<Ts...>::value;
@@ -404,43 +404,59 @@ enum JSS
     NEWLINE_TABx2       = 0xF   // gap
 }; // enum JSS
 
+// definition of style, reused multiple times below
+#define JSONSTYLESTRUCT                                                        \
+    {                                                                          \
+        bool cr : 1;                                                           \
+        bool lf : 1;                                                           \
+                                                                               \
+        bool hardTab : 1;                                                      \
+        unsigned int tabCount : 4;                                             \
+                                                                               \
+        /* [ <gap A> value, <gap B> value <gap C> ] */                         \
+        unsigned int gapA : 4;                                                 \
+        unsigned int gapB : 4;                                                 \
+        unsigned int gapC : 4;                                                 \
+                                                                               \
+        /* { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> } */ \
+        unsigned int gap1 : 4;                                                 \
+        unsigned int gap2 : 4;                                                 \
+        unsigned int gap3 : 4;                                                 \
+        unsigned int gap4 : 4;                                                 \
+        unsigned int gap5 : 4;                                                 \
+        unsigned int gap6 : 4;                                                 \
+        unsigned int gap7 : 4;                                                 \
+                                                                               \
+        unsigned int emptyArray : 2;                                           \
+        unsigned int emptyObject : 2;                                          \
+        unsigned int sva : 2;                                                  \
+        unsigned int svo : 2;                                                  \
+    }
+
 namespace internal
 {
 
+// used to measure the size of the bitfield-based structure
+struct MeasureJSONStyle JSONSTYLESTRUCT;
+
+// If well packed, the style structure will fit into 64 bits, but if not, we
+// can use 128 bits.
+template <size_t bytes>
+using VALUE_TYPE =
+    std::conditional_t<(bytes <= 8), uint64_t, std::conditional_t<(bytes > 8) && (bytes <= 16), __uint128_t, void> >;
+using VALUE_T = VALUE_TYPE<sizeof(MeasureJSONStyle)>;
+
+// used to define the DEFAULTJSONCONFIG before use as default value (format
+// must match the bitfield packing, so no hard-wired constant can be used)
 union ForwardJSONStyle
 {
-    struct
-    {
-        bool cr : 1;
-        bool lf : 1;
-
-        bool hardTab : 1;
-        unsigned int tabCount : 4;
-
-        // [ <gap A> value, <gap B> value <gap C> ]
-        unsigned int gapA : 4;
-        unsigned int gapB : 4;
-        unsigned int gapC : 4;
-
-        // { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> }
-        unsigned int gap1 : 4;
-        unsigned int gap2 : 4;
-        unsigned int gap3 : 4;
-        unsigned int gap4 : 4;
-        unsigned int gap5 : 4;
-        unsigned int gap6 : 4;
-        unsigned int gap7 : 4;
-
-        unsigned int emptyArray : 2;
-        unsigned int emptyObject : 2;
-        unsigned int sva : 2;
-        unsigned int svo : 2;
-    };
-    uint64_t value;
+    struct JSONSTYLESTRUCT;
+    VALUE_T value;
 };
 
 } // namespace internal
 
+// built-in default, which can be replaced by user-configured default
 constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
 {
     {
@@ -477,51 +493,23 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
     }
 };
 
+// a union to allow access to individual style members as well as treat as
+// integer for use with {fmt}
 union JSONStyle
 {
 public:
-    struct
-    {
-        bool cr : 1;
-        bool lf : 1;
+    struct JSONSTYLESTRUCT;
+    internal::VALUE_T value;
 
-        bool hardTab : 1;
-        unsigned int tabCount : 4;
-
-        // [ <gap A> value, <gap B> value <gap C> ]
-        unsigned int gapA : 4;
-        unsigned int gapB : 4;
-        unsigned int gapC : 4;
-
-        // { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> }
-        unsigned int gap1 : 4;
-        unsigned int gap2 : 4;
-        unsigned int gap3 : 4;
-        unsigned int gap4 : 4;
-        unsigned int gap5 : 4;
-        unsigned int gap6 : 4;
-        unsigned int gap7 : 4;
-
-        unsigned int emptyArray : 2;
-        unsigned int emptyObject : 2;
-        unsigned int sva : 2;
-        unsigned int svo : 2;
-    };
-    uint64_t value;
-
-    JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value) : value(val)
+    JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value)
+      : value(val)
     {}
 };
-
-static_assert(sizeof(uint64_t) == (64 / 8));
-// char (*__kaboom)[sizeof(uint64_t)] = 1;
-
-static_assert(sizeof(JSONStyle) <= sizeof(uint64_t));
-// char (*__kaboom)[sizeof(JSONStyle)] = 1;
 
 namespace internal
 {
 
+// wrapper of JSONStyle that expands configuration to strings used in output
 class JSONStyleHelper
 {
 public:
@@ -530,7 +518,7 @@ public:
     JSONStyle mStyle;
 
     void updateExpansions()
-    {        
+    {
         tab = mStyle.hardTab
               ? string(mStyle.tabCount, '\t')
               : string(mStyle.tabCount, ' ');
@@ -757,7 +745,7 @@ styleOrigin = "from nested arg";
             styleOrigin = "from direct arg";
 
 LOG("mArgData[STYLE_PARM_INDEX]: {}", mArgData[STYLE_PARM_INDEX]);
-            auto styleSetting = 
+            auto styleSetting =
                 ToValue<uint64_t>(mArgData[STYLE_PARM_INDEX]);
             mStyleHelper = internal::JSONStyleHelper(styleSetting);
         }
@@ -925,7 +913,7 @@ template<typename T, typename Char>
 struct fmt::formatter<T,
                       Char,
                       std::enable_if_t<fmtster::internal::is_container_v<T> > >
-    : fmtster::FmtsterBase
+  : fmtster::FmtsterBase
 {
     template<typename FormatContext>
     using FCIt_t = decltype(std::declval<FormatContext>().out());
@@ -978,7 +966,7 @@ itOut = fmt::format_to(itOut,
                        mFormatSetting,
                        (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value)
                        ? 0
-                           : mStyleHelper.mStyle.value,
+                       : mStyleHelper.mStyle.value,
                        "",
                        mDataIndentSetting);
         }
@@ -1040,9 +1028,9 @@ LOGENTRY;
 decipherParms(ctx);
 
         // output opening bracket/brace (if enabled)
-        auto itOut = mDisableBras ?
-                     ctx.out() :
-                     fmt::format_to(ctx.out(), is_braceable_v<T> ? "{{" : "[");
+        auto itOut = mDisableBras
+                     ? ctx.out()
+                     : fmt::format_to(ctx.out(), is_braceable_v<T> ? "{{" : "[");
 
         const bool empty = (sc.end() == sc.begin());
 
@@ -1111,7 +1099,7 @@ LOGEXIT;
 // fmt::formatter<> for std::pair<>
 template<typename T1, typename T2>
 struct fmt::formatter<std::pair<T1, T2> >
-    : fmtster::FmtsterBase
+  : fmtster::FmtsterBase
 {
     // create format string
     std::string createPairFormatString(const T1& v1, const T2& v2)
@@ -1146,7 +1134,7 @@ decipherParms(ctx);
 // fmt::formatter<> for std::tuple<> (wraps group of heterogeneous objects known at compile time)
 template<typename... Ts>
 struct fmt::formatter<std::tuple<Ts...> >
-    : fmtster::FmtsterBase
+  : fmtster::FmtsterBase
 {
     template<typename FormatContext>
     auto format(const std::tuple<Ts...>& tup, FormatContext& ctx)
@@ -1270,3 +1258,5 @@ it = format_to(it, "  \"svo\" : {:02b}", style.svo);
         return it;
     }
 };
+
+#undef JSONSTYLESTRUCT
