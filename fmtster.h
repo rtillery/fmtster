@@ -21,16 +21,20 @@
  * SOFTWARE.
  */
 
+#define FMTSTER_VERSION 000400 // 0.4.0
+
 #define LOGENABLE
 
 #ifdef LOGENABLE
 #include <iostream>
+using std::cout;
+using std::endl;
 
 #define LOGPREAMBLE \
 std::cout << "(" << __LINE__ << ") " << __func__ << "()"
 
 #define LOGMID(...) \
-std::cout << fmt::format(__VA_ARGS__)
+std::cout << __VA_ARGS__
 
 #define LOGBEGIN(...) \
 LOGPREAMBLE;          \
@@ -57,11 +61,11 @@ LOGEND(" exit")
 #define LOGMID(...)
 #define LOG(...)
 #define LOGENTRY
+#define LOGEXIT
+#define LOGBEGIN
 #define LOGEND
 
 #endif // !LOGENABLE
-
-#define FMTSTER_VERSION 000400 // 0.4.0
 
 #include <algorithm>
 #include <cstdint>
@@ -600,7 +604,7 @@ LOGENTRY;
 auto i = ctx.begin();
 LOGBEGIN("");
 while (i != ctx.end())
-    LOGMID("{}", *(i++));
+    LOGMID(*(i++));
 LOGEND("\"");
 
         int parmIndex = 0;
@@ -633,15 +637,15 @@ LOGEND("\"");
             it++;
         }
 
-LOG("[0]: \"{}\", {}", mArgData[0], mNestedArgIndex[0]);
+LOG("[0]: \"" << mArgData[0] << "\", " << mNestedArgIndex[0]);
 if (mArgData.size() > 1)
 {
-    LOG("[1]: \"{}\", {}", mArgData[1], mNestedArgIndex[1]);
+    LOG("[1]: \"" << mArgData[1] << "\", " << mNestedArgIndex[1]);
     if (mArgData.size() > 2)
     {
-        LOG("[2]: \"{}\", {}", mArgData[2], mNestedArgIndex[2]);
+        LOG("[2]: \"" << mArgData[2] << "\", " << mNestedArgIndex[2]);
         if (mArgData.size() > 3)
-            LOG("[3]: \"{}\", {}", mArgData[3], mNestedArgIndex[3]);
+            LOG("[3]: \"" << mArgData[3] << "\", " << mNestedArgIndex[3]);
     }
 }
 
@@ -657,6 +661,7 @@ LOGEXIT;
     template<typename FormatContext>
     void decipherParms(FormatContext& ctx)
     {
+LOGENTRY;
         using namespace fmtster::internal;
 
         // ensure vectors are large enough for unchecked processing below
@@ -693,17 +698,17 @@ LOGEXIT;
             );
 
             mFormatSetting = FormatToValue<decltype(mFormatSetting)>(formatSetting);
-LOG("mFormatSetting (from nested arg): {}", mFormatSetting);
+LOG("mFormatSetting (from nested arg): " << mFormatSetting);
         }
         else if(!mArgData[FORMAT_PARM_INDEX].empty())
         {
-LOG("mArgData[FORMAT_PARM_INDEX]: {}", mArgData[FORMAT_PARM_INDEX]);
+LOG("mArgData[FORMAT_PARM_INDEX]: " << mArgData[FORMAT_PARM_INDEX]);
             mFormatSetting = FormatToValue<decltype(mFormatSetting)>(mArgData[FORMAT_PARM_INDEX]);
-LOG("mFormatSetting (from direct arg): {}", mFormatSetting);
+LOG("mFormatSetting (from direct arg): " << mFormatSetting);
         }
 else
 {
-LOG("default mFormatSetting: {}", mFormatSetting);
+LOG("default mFormatSetting: " << mFormatSetting);
 }
 
 
@@ -744,7 +749,7 @@ styleOrigin = "from nested arg";
         {
             styleOrigin = "from direct arg";
 
-LOG("mArgData[STYLE_PARM_INDEX]: {}", mArgData[STYLE_PARM_INDEX]);
+LOG("mArgData[STYLE_PARM_INDEX]: " << mArgData[STYLE_PARM_INDEX]);
             auto styleSetting =
                 ToValue<uint64_t>(mArgData[STYLE_PARM_INDEX]);
             mStyleHelper = internal::JSONStyleHelper(styleSetting);
@@ -753,8 +758,7 @@ else
 {
 styleOrigin = "default";
 }
-LOG("mStyleHelper.mStyle ({}): {:,,!},\nmStyleHelper.mStyle.value: {}",
-    styleOrigin, mStyleHelper.mStyle, mStyleHelper.mStyle.value);
+LOG("mStyleHelper.mStyle.value (" << styleOrigin << "): " << mStyleHelper.mStyle.value);
 
 
 
@@ -768,36 +772,38 @@ LOG("mStyleHelper.mStyle ({}): {:,,!},\nmStyleHelper.mStyle.value: {}",
         {
             auto pcpArg = ctx.arg(mNestedArgIndex[PER_CALL_PARM_INDEX]);
             pcpSetting = visit_format_arg(
-                [](auto value) -> int
+                [](auto value) -> string
                 {
-                    if constexpr (std::conjunction_v<std::is_same<const char*, decltype(value)>,
+                    if constexpr (std::disjunction_v<std::is_same<const char*, decltype(value)>,
                                                      fmtster::internal::is_string<decltype(value)> >)
                     {
                         return value;
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type");
+LOG("per call parms types accepted: \n" << typeid(const char*).name() << ", " << typeid(std::string).name());
+                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
                     }
                 },
                 pcpArg);
 
-LOG("pcpSetting (from nested arg): {}", pcpSetting);
+LOG("pcpSetting (from nested arg): " << pcpSetting);
         }
         else if (!mArgData[PER_CALL_PARM_INDEX].empty())
         {
-LOG("mArgData[PER_CALL_PARM_INDEX]: {}", mArgData[PER_CALL_PARM_INDEX]);
+LOG("mArgData[PER_CALL_PARM_INDEX]: " << mArgData[PER_CALL_PARM_INDEX]);
             pcpSetting = mArgData[PER_CALL_PARM_INDEX];
-LOG("pcpSetting (from direct arg): {}", pcpSetting);
+LOG("pcpSetting (from direct arg): " << pcpSetting);
         }
 else
 {
-LOG("pcpSetting (default): {}", pcpSetting);
+LOG("pcpSetting (default): " << pcpSetting);
 }
 
         // parse those parms
         if (!pcpSetting.empty())
         {
+LOG("parsing pcp");
             bool negate = false;
             for (const auto c : pcpSetting)
             {
@@ -820,6 +826,7 @@ case '1': mDisableBras = true; break;
         //
         // indent
         //
+LOG("checking for indent");
         const size_t INDENT_PARM_INDEX = 3;
         if (mNestedArgIndex[INDENT_PARM_INDEX])
         {
@@ -833,7 +840,7 @@ case '1': mDisableBras = true; break;
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type");
+                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
                     }
                 },
                 indentArg);
@@ -850,7 +857,7 @@ case '1': mDisableBras = true; break;
                                                 mBraIndentSetting));
 
         mDataIndentSetting = mDisableBras ? mBraIndentSetting : mBraIndentSetting + 1;
-LOG("mBraIndentSetting: {}, mDataIndentSetting: {}", mBraIndentSetting ,mDataIndentSetting);
+LOG("mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " << mDataIndentSetting);
 
         mBraIndent.clear();
         auto i = mBraIndentSetting;
@@ -862,7 +869,7 @@ LOG("mBraIndentSetting: {}, mDataIndentSetting: {}", mBraIndentSetting ,mDataInd
         while (i--)
             mDataIndent += mStyleHelper.tab;
 
-LOG("decipherParms() exit");
+LOGEXIT;
     } // decipherParms()
 
     // templated function to provide non-container {fmt} string
@@ -896,7 +903,8 @@ LOG("decipherParms() exit");
         return fmt::format("{{:{},{},{},{}}}{}",
                            mFormatSetting,
                            (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value)
-                           ? 0 : mStyleHelper.mStyle.value,
+                           ? 0
+                           : mStyleHelper.mStyle.value,
                            "",
                            mDataIndentSetting,
                            addComma ? "," : "");
@@ -923,9 +931,9 @@ struct fmt::formatter<T,
     std::enable_if_t<std::negation_v<fmtster::internal::is_multimappish<C> > >
         format_loop(const C& c, FCIt_t<FormatContext>& itOut)
     {
-        using namespace fmtster::internal;
-
 LOGENTRY;
+
+        using namespace fmtster::internal;
 
         auto itC = c.begin();
         while (itC != c.end())
@@ -953,13 +961,13 @@ else
 //             fmtStr += createFormatString(val, "", !is_braceable_v<C>, itC != c.end());
 
 //             itOut = fmt::format_to(itOut, fmtStr, fmtster::internal::EscapeJSONString(val));
-LOG("fmtStr: \"{}\"", fmtStr);
-// LOG("val: \"{}\"", fmtster::internal::EscapeJSONString(val));
-LOG("val type: {}", typeid(val).name());
-LOG("mFormatSetting: {}", mFormatSetting);
-LOG("mStyleHelper.mStyle.value(: {}", mStyleHelper.mStyle.value);
+LOG("fmtStr: \"" << fmtStr << "\"");
+// LOG("val: \"" << fmtster::internal::EscapeJSONString(val) << "\"", );
+LOG("val type: " << typeid(val).name());
+LOG("mFormatSetting: " << mFormatSetting);
+LOG("mStyleHelper.mStyle.value(: " << mStyleHelper.mStyle.value);
 LOG("\"\"");
-LOG("mDataIndentSetting: {}", mDataIndentSetting);
+LOG("mDataIndentSetting: " << mDataIndentSetting);
 itOut = fmt::format_to(itOut,
                        fmtStr,
                        fmtster::internal::EscapeJSONString(val),
@@ -979,9 +987,9 @@ LOGEXIT;
     std::enable_if_t<fmtster::internal::is_multimappish_v<C> >
         format_loop(const C& c, FCIt_t<FormatContext>& itOut)
     {
-        using namespace fmtster::internal;
-
 LOGENTRY;
+
+        using namespace fmtster::internal;
 
         auto remainingElements = c.size();
         if (c.empty())
@@ -1101,33 +1109,33 @@ template<typename T1, typename T2>
 struct fmt::formatter<std::pair<T1, T2> >
   : fmtster::FmtsterBase
 {
-    // create format string
-    std::string createPairFormatString(const T1& v1, const T2& v2)
-    {
-        std::string fmtStr;
-
-        if (!mDisableBras)
-            fmtStr += "{{\n";
-
-        fmtStr += createFormatString(v1, mDataIndent, false, false);
-        fmtStr += " : ";
-        fmtStr += createFormatString(v2, "", true, false);
-
-        if (!mDisableBras)
-            fmtStr += fmt::format("\n{}}}}}", mBraIndent);
-
-        return fmtStr;
-    } // createPairFormatString()
-
     template<typename FormatContext>
     auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
     {
         using namespace fmtster::internal;
 decipherParms(ctx);
 
-        return format_to(ctx.out(),
-                         createPairFormatString(p.first, p.second),
-                         EscapeJSONString(p.first), EscapeJSONString(p.second));
+auto it = format_to(ctx.out(),
+                    createFormatString(p.first, mDataIndent, false, false),
+                    EscapeJSONString(p.first));
+it = format_to(it, " : ");
+if (!fmtster::internal::is_fmtsterable_v<decltype(p.second)>)
+{
+    it = format_to(it,
+                   createFormatString(p.second, "", true, false),
+                   EscapeJSONString(p.second));
+}
+else
+{
+    it = format_to(it,
+                   "{:{},{},{},{}}",
+                   p.second,
+                   mFormatSetting,
+                   (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
+                   "",
+                   mDataIndentSetting);
+}
+return it;
     }
 }; // struct fmt::formatter<std::pair<> >
 
@@ -1255,6 +1263,7 @@ it = format_to(it, "  \"svo\" : {:02b}", style.svo);
                 it = format_to(it, "\n{}}}", mBraIndent);
         }
 
+LOGEXIT;
         return it;
     }
 };

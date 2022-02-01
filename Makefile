@@ -23,6 +23,7 @@ LD=ld
 CFLAGS=-std=c++17
 LFLAGS=
 LIBS=-lpthread -lfmt
+# LIBS=-lfmt -L/usr/lib/x86_64-linux-gnu/libpthread.so
 TESTLIBS=-lgtest -lgtest_main
 
 all: fmtstertest example-json JSONStyle_if_no_fmt_custom_nested_args
@@ -31,7 +32,7 @@ fmtstertest.o: fmtstertest.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 fmtstertest: fmtstertest.o
-	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS) $(TESTLIBS)
+	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(TESTLIBS) $(LIBS)
 	strip $@
 
 example-json.o: example-json.cpp fmtster.h Makefile
