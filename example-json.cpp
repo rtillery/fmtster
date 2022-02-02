@@ -144,6 +144,7 @@ Personnel GetPersonnel()
 
 int main()
 {
+cout << "Hello world." << endl;
     vector<int> v = { 1, 2 };
 //     cout << F("blanks: {}", v) << endl;
 // cout << __LINE__ << endl;

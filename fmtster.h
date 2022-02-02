@@ -23,7 +23,7 @@
 
 #define FMTSTER_VERSION 000400 // 0.4.0
 
-#define LOGENABLE
+// #define LOGENABLE
 
 #ifdef LOGENABLE
 #include <iostream>
@@ -604,11 +604,13 @@ LOGENTRY;
 LOG("this: " << typeid(*this).name())
 
         // generic handling of N comma-separated parms, including recursive braces
+#ifdef LOGENABLE
 auto i = ctx.begin();
 LOGBEGIN("");
 while (i != ctx.end())
     LOGMID(*(i++));
 LOGEND("\"");
+#endif // LOGENABLE
 
         int parmIndex = 0;
         int braces = 1;
@@ -719,11 +721,15 @@ LOG("default mFormatSetting: " << mFormatSetting);
         //
         // style
         //
+#ifdef LOGENABLE
         string styleOrigin;
+#endif // LOGENABLE
         const size_t STYLE_PARM_INDEX = 1;
         if (mNestedArgIndex[STYLE_PARM_INDEX])
         {
+#ifdef LOGENABLE
 styleOrigin = "from nested arg";
+#endif // LOGENABLE
 
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_PARM_INDEX]);
             auto styleSetting = visit_format_arg(
@@ -749,7 +755,9 @@ styleOrigin = "from nested arg";
         }
         else if(!mArgData[STYLE_PARM_INDEX].empty())
         {
+#ifdef LOGENABLE
             styleOrigin = "from direct arg";
+#endif // LOGENABLE
 
 LOG("mArgData[STYLE_PARM_INDEX]: " << mArgData[STYLE_PARM_INDEX]);
             auto styleSetting =
@@ -758,14 +766,11 @@ LOG("mArgData[STYLE_PARM_INDEX]: " << mArgData[STYLE_PARM_INDEX]);
         }
 else
 {
+#ifdef LOGENABLE
 styleOrigin = "default";
+#endif // LOGENABLE
 }
 LOG("mStyleHelper.mStyle.value (" << styleOrigin << "): " << mStyleHelper.mStyle.value);
-
-mBraIndent.clear();
-for (size_t i = mBraIndentSetting; i > 0; --i)
-    mBraIndent += mStyleHelper.tab;
-mDataIndent = mBraIndent + mStyleHelper.tab;
 
 
 
@@ -867,13 +872,9 @@ LOG("checking for indent");
 LOG("mBraIndentSetting: " << mBraIndentSetting << ", mDataIndentSetting: " << mDataIndentSetting);
 
         mBraIndent.clear();
-        auto i = mBraIndentSetting;
-        while (i--)
+        for (auto i = mBraIndentSetting; i; --i)
             mBraIndent += mStyleHelper.tab;
-
-        mDataIndent.clear();
-        i = mDataIndentSetting;
-        while (i--)
+        if (mDataIndentSetting > mBraIndentSetting)
             mDataIndent += mStyleHelper.tab;
 
 LOGEXIT;
@@ -923,38 +924,39 @@ LOG("formatter type: " << typeid(*this).name());
             if (!is_braceable_v<decltype(val)>)
                 fmtStr += mBraIndent;
 
+            if (!is_braceable_v<C>)
+                fmtStr += mDataIndent;
+
             // this is done ahead to determine comma insertion
             itC++;
 
-if (!fmtster::internal::is_fmtsterable_v<decltype(val)>)
-{
+            if (!fmtster::internal::is_fmtsterable_v<decltype(val)>)
+            {
 LOG("!is_fmtsterable<>");
-if (fmtster::internal::is_string_v<decltype(val)>)
-    fmtStr += (itC != c.end()) ? "\"{}\"," : "\"{}\"";
-else
-    fmtStr += (itC != c.end()) ? "{}," : "{}";
+            if (fmtster::internal::is_string_v<decltype(val)>)
+                fmtStr += (itC != c.end()) ? "\"{}\"," : "\"{}\"";
+            else
+                fmtStr += (itC != c.end()) ? "{}," : "{}";
 LOG("fmtStr: \"" << fmtStr << "\"");
-itFC = fmt::format_to(itFC, fmtStr, val);
-}
-else
-{
+            itFC = fmt::format_to(itFC, fmtStr, val);
+            }
+            else
+            {
 LOG("is_fmtsterable<>");
-    fmtStr += "{:{},{},{},{}}";
-    if (itC != c.end())
-        fmtStr += ",";
+                fmtStr += (itC != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
 LOG("fmtStr: \"" << fmtStr << "\"");
 LOG("mFormatSetting: " << mFormatSetting);
 LOG("mStyleHelper.mStyle.value: " << mStyleHelper.mStyle.value);
 LOG("\"\"");
 LOG("mDataIndentSetting: " << mDataIndentSetting);
-itFC = fmt::format_to(itFC,
-                       fmtStr,
-                       fmtster::internal::EscapeIfJSONString(val),
-                       mFormatSetting,
-                       mStyleHelper.mStyle.value,
-                       "",
-                       mDataIndentSetting);
-}
+                itFC = fmt::format_to(itFC,
+                                       fmtStr,
+                                       fmtster::internal::EscapeIfJSONString(val),
+                                       mFormatSetting,
+                                       mStyleHelper.mStyle.value,
+                                       "",
+                                       mDataIndentSetting);
+            }
         }
 
 LOGEXIT;
@@ -984,11 +986,11 @@ LOGENTRY;
                     fmtStr = "\n";
 
                 const auto& key = itCnt->first;
-if (fmtster::internal::is_string_v<decltype(key)>)
-    fmtStr += "{}\"{}\" : ";
-else
-    fmtStr += "{}{} : ";
-itFC = fmt::format_to(itFC, fmtStr, mDataIndent, EscapeIfJSONString(key));
+                if (fmtster::internal::is_string_v<decltype(key)>)
+                    fmtStr += "{}\"{}\" : ";
+                else
+                    fmtStr += "{}{} : ";
+                itFC = fmt::format_to(itFC, fmtStr, mDataIndent, EscapeIfJSONString(key));
 
                 // insert each value with the same key into a temp vector to
                 // print
@@ -999,13 +1001,14 @@ itFC = fmt::format_to(itFC, fmtStr, mDataIndent, EscapeIfJSONString(key));
                     itCnt++;
                 } while ((itCnt != c.end()) && (itCnt->first == key));
 
-itFC = format_to(itFC,
-                (itCnt != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}",
-                vals,
-                mFormatSetting,
-                (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
-                "",
-                mDataIndentSetting);
+                fmtStr = (itCnt != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
+                itFC = format_to(itFC,
+                                fmtStr,
+                                vals,
+                                mFormatSetting,
+                                mStyleHelper.mStyle.value,
+                                "",
+                                mDataIndentSetting);
             }
         }
 

@@ -20,7 +20,7 @@
 
 CXX=g++
 LD=ld
-CFLAGS=-std=c++17
+CFLAGS=-std=c++17 -g
 LFLAGS=
 LIBS=-lpthread -lfmt
 # LIBS=-lfmt -L/usr/lib/x86_64-linux-gnu/libpthread.so
@@ -33,18 +33,18 @@ fmtstertest.o: fmtstertest.cpp fmtster.h Makefile
 
 fmtstertest: fmtstertest.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(TESTLIBS) $(LIBS)
-	strip $@
+#	strip $@
 
 example-json.o: example-json.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 example-json: example-json.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
-	strip $@
+#	strip $@
 
 JSONStyle_if_no_fmt_custom_nested_args.o: JSONStyle_if_no_fmt_custom_nested_args.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 JSONStyle_if_no_fmt_custom_nested_args: JSONStyle_if_no_fmt_custom_nested_args.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
-	strip $@
+#	strip $@
