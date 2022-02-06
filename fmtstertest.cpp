@@ -550,18 +550,18 @@ TEST_F(FmtsterTest, Reference)
 
 // value container tests
 
-// ARRAYCONTAINERTESTS()
-// VALUECONTAINERTESTS(vector)
-// VALUECONTAINERTESTS(forward_list)
-// VALUECONTAINERTESTS(list)
-// VALUECONTAINERTESTS(deque)
-// VALUECONTAINERTESTS(set)
-// VALUECONTAINERTESTS(unordered_set)
-// VALUECONTAINERTESTS(multiset)
-// VALUECONTAINERTESTS(unordered_multiset)
-// VALUECONTAINERTESTS(stack)
-// VALUECONTAINERTESTS(queue)
-// VALUECONTAINERTESTS(priority_queue)
+ARRAYCONTAINERTESTS()
+VALUECONTAINERTESTS(vector)
+VALUECONTAINERTESTS(forward_list)
+VALUECONTAINERTESTS(list)
+VALUECONTAINERTESTS(deque)
+VALUECONTAINERTESTS(set)
+VALUECONTAINERTESTS(unordered_set)
+VALUECONTAINERTESTS(multiset)
+VALUECONTAINERTESTS(unordered_multiset)
+VALUECONTAINERTESTS(stack)
+VALUECONTAINERTESTS(queue)
+VALUECONTAINERTESTS(priority_queue)
 
 array<string, 3> CreateContainer()
 {
@@ -572,10 +572,10 @@ array<string, 3> CreateContainer()
 
 // key/value container tests
 
-// KEYVALUECONTAINERTESTS(map)
-// KEYVALUECONTAINERTESTS(unordered_map)
-// KEYVALUECONTAINERTESTS(multimap)
-// KEYVALUECONTAINERTESTS(unordered_multimap)
+KEYVALUECONTAINERTESTS(map)
+KEYVALUECONTAINERTESTS(unordered_map)
+KEYVALUECONTAINERTESTS(multimap)
+KEYVALUECONTAINERTESTS(unordered_multimap)
 
 TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON)
 {
@@ -651,7 +651,7 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, map_of_vectors_of_strings_to_JSON)
 {
-    F("{}", fmtster::JSONStyle{});
+//     F("{}", fmtster::JSONStyle{});
 
     map<string, vector<string> > mapofvectorofstrings =
     {
@@ -794,7 +794,7 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, EscapedValues)
 {
-    F("{}", fmtster::JSONStyle{});
+//     F("{}", fmtster::JSONStyle{});
 
     map<string, vector<string> > mapofvectorofstrings =
     {

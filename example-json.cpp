@@ -83,8 +83,8 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
 
         const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
                                         mFormatSetting,
-1,
-mStyleHelper.tab.size(),
+                                        mStyleHelper.mStyle.value,
+                                        "",
                                         mIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
@@ -140,11 +140,8 @@ Personnel GetPersonnel()
     };
 }
 
-#include <exception>
-
 int main()
 {
-cout << "Hello world." << endl;
     vector<int> v = { 1, 2 };
 //     cout << F("blanks: {}", v) << endl;
 // cout << __LINE__ << endl;
