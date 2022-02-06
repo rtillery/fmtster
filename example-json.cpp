@@ -85,7 +85,7 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
                                         mFormatSetting,
 1,
 mStyleHelper.tab.size(),
-                                        mDataIndentSetting);
+                                        mIndentSetting);
         const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
         itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
 

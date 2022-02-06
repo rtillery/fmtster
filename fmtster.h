@@ -33,6 +33,11 @@
 #include <utility>
 #include <vector>
 
+#include <iostream>
+using std::cout;
+using std::endl;
+using std::boolalpha;
+
 namespace fmtster
 {
 using std::find;
@@ -65,6 +70,9 @@ template<typename>
 struct fmtster_true
   : true_type
 {};
+
+template<typename T>
+using simplify_type = std::remove_cv_t<std::remove_reference_t<T> >;
 
 //
 // macro to create has_FN<> templates (also creates has_FN_v<> helper)
@@ -218,7 +226,7 @@ inline constexpr bool is_tuple_v = is_tuple<Ts...>::value;
 
 // tools for use below
 fmtster_MAKEIS(fmtsterable,
-               (std::is_base_of_v<fmtster::FmtsterBase, fmt::formatter<T> >));
+               (std::is_base_of_v<fmtster::FmtsterBase, fmt::formatter<simplify_type<T> > >));
 fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
                                          is_multimappish<T>,
                                          is_pair<T>,
@@ -248,39 +256,39 @@ T EscapeIfJSONString(const T& val)
 }
 // escape string the JSON way
 template<>
-string EscapeIfJSONString(const string& str)
+string EscapeIfJSONString(const string& strIn)
 {
-    string out;
-    out.reserve(str.length() * 6);
-    for (const char c : str)
+    string strOut;
+    strOut.reserve(strIn.length() * 6);
+    for (const char c : strIn)
     {
         if ((c <= '\x1F') || (c >= '\x7F'))
         {
             switch (c)
             {
-            case '\b': out += R"(\b)"; break;
-            case '\f': out += R"(\f)"; break;
-            case '\n': out += R"(\n)"; break;
-            case '\r': out += R"(\r)"; break;
-            case '\t': out += R"(\t)"; break;
+            case '\b': strOut += R"(\b)"; break;
+            case '\f': strOut += R"(\f)"; break;
+            case '\n': strOut += R"(\n)"; break;
+            case '\r': strOut += R"(\r)"; break;
+            case '\t': strOut += R"(\t)"; break;
             default:
-                out += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
+                strOut += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
             }
         }
         else
         {
             switch (c)
             {
-            case '\\':   out += R"(\\)"; break;
-            case '\"':   out += R"(\")"; break;
-            case '/':    out += R"(\/)"; break;
-            case '\x7F': out += R"(\u007F)"; break;
-            default:     out += c;
+            case '\\':   strOut += R"(\\)"; break;
+            case '\"':   strOut += R"(\")"; break;
+            case '/':    strOut += R"(\/)"; break;
+            case '\x7F': strOut += R"(\u007F)"; break;
+            default:     strOut += c;
             }
         }
     }
 
-    return out;
+    return strOut;
 } // EscapeIfJSONString()
 
 template<typename T>
@@ -529,8 +537,7 @@ struct FmtsterBase
     internal::JSONStyleHelper mStyleHelper = sDefaultStyleHelper.mStyle.value;
 
     // from indent
-    size_t mBraIndentSetting = 0;  // beginning number of brace/bracket indents
-    size_t mDataIndentSetting = 1; // beginning number of data indents
+    size_t mIndentSetting = 0;
 
     // from per call parms
     bool mDisableBras = false;
@@ -622,13 +629,13 @@ struct FmtsterBase
                     //  run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
-                    if constexpr (std::is_integral_v<decltype(value)>)
+                    if constexpr (std::is_integral_v<simplify_type<decltype(value)> >)
                     {
                         return value;
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type");
+                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
                     }
                 },
                 formatArg
@@ -658,13 +665,13 @@ struct FmtsterBase
                     //  at run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
-                    if constexpr (std::is_integral_v<decltype(value)>)
+                    if constexpr (std::is_integral_v<fmtster::internal::simplify_type<decltype(value)> >)
                     {
                         return value;
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type");
+                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
                     }
                 },
                 styleArg
@@ -692,8 +699,8 @@ struct FmtsterBase
             pcpSetting = visit_format_arg(
                 [](auto value) -> string
                 {
-                    if constexpr (std::disjunction_v<std::is_same<const char*, decltype(value)>,
-                                                     fmtster::internal::is_string<decltype(value)> >)
+                    if constexpr (std::disjunction_v<std::is_same<simplify_type<const char*>, simplify_type<decltype(value)> >,
+                                                     fmtster::internal::is_string<simplify_type<decltype(value)> > >)
                     {
                         return value;
                     }
@@ -708,6 +715,42 @@ struct FmtsterBase
         {
             pcpSetting = mArgData[PER_CALL_PARM_INDEX];
         }
+
+
+
+        //
+        // indent
+        //
+        const size_t INDENT_PARM_INDEX = 3;
+        if (mNestedArgIndex[INDENT_PARM_INDEX])
+        {
+            auto indentArg = ctx.arg(mNestedArgIndex[INDENT_PARM_INDEX]);
+            auto indentSetting = visit_format_arg(
+                [](auto value) -> int
+                {
+                    if constexpr (std::is_integral_v<simplify_type<decltype(value)> >)
+                    {
+                        return value;
+                    }
+                    else
+                    {
+                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
+                    }
+                },
+                indentArg);
+
+            mIndentSetting = indentSetting;
+        }
+        else if (!mArgData[INDENT_PARM_INDEX].empty())
+        {
+            mIndentSetting = ToValue<decltype(mIndentSetting)>(mArgData[INDENT_PARM_INDEX]);
+        }
+
+        if (mIndentSetting < 0)
+            throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
+                                                mIndentSetting));
+
+
 
         // parse those parms
         if (!pcpSetting.empty())
@@ -728,52 +771,28 @@ struct FmtsterBase
             }
         }
 
-
-        //
-        // indent
-        //
-        const size_t INDENT_PARM_INDEX = 3;
-        if (mNestedArgIndex[INDENT_PARM_INDEX])
-        {
-            auto indentArg = ctx.arg(mNestedArgIndex[INDENT_PARM_INDEX]);
-            auto indentSetting = visit_format_arg(
-                [](auto value) -> int
-                {
-                    if constexpr (std::is_integral_v<decltype(value)>)
-                    {
-                        return value;
-                    }
-                    else
-                    {
-                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
-                    }
-                },
-                indentArg);
-
-            mBraIndentSetting = indentSetting;
-        }
-        else if (!mArgData[INDENT_PARM_INDEX].empty())
-        {
-            mBraIndentSetting = ToValue<decltype(mBraIndentSetting)>(mArgData[INDENT_PARM_INDEX]);
-        }
-
-        if (mBraIndentSetting < 0)
-            throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
-                                                mBraIndentSetting));
-
-        mDataIndentSetting = mDisableBras ? mBraIndentSetting : mBraIndentSetting + 1;
-
+        // expand indenting
         mBraIndent.clear();
-        for (auto i = mBraIndentSetting; i; --i)
+        for (auto i = mIndentSetting; i; --i)
             mBraIndent += mStyleHelper.tab;
-        if (mDataIndentSetting > mBraIndentSetting)
-            mDataIndent += mStyleHelper.tab;
+        mDataIndent = mBraIndent + mStyleHelper.tab;
 
     } // decipherParms()
 }; // struct FmtterBase
 
 extern unsigned int FmtsterBase::sDefaultFormat;
 extern internal::JSONStyleHelper FmtsterBase::sDefaultStyleHelper;
+
+template<typename T>
+constexpr bool HasFmtsterBaseHelper()
+{ return false; }
+template<>
+constexpr bool HasFmtsterBaseHelper<FmtsterBase>()
+{ return true; }
+
+template<typename T>
+constexpr bool HasFmtsterBase()
+{ return HasFmtsterBaseHelper<fmt::formatter<T> >(); }
 
 } // namespace fmtster
 
@@ -787,9 +806,10 @@ struct fmt::formatter<T,
     template<typename FormatContext>
     using FCIt_t = decltype(std::declval<FormatContext>().out());
 
-    // templated function inner loop function for all containers except multimaps
-    // (this can be used for single data per element & map-like containers
-    // because map-like containers use a std::pair<> for each element)
+    // templated function inner loop function for ALL CONTAINERS except
+    // multimaps (this can be used for single data per element & map-like
+    // containers because map-like containers use a std::pair<> for each
+    // element)
     template<typename FormatContext, typename C = T>
     std::enable_if_t<std::negation_v<fmtster::internal::is_multimappish<C> > >
         format_loop(const C& c, FCIt_t<FormatContext>& itFC)
@@ -799,39 +819,52 @@ struct fmt::formatter<T,
         auto itC = c.begin();
         while (itC != c.end())
         {
+            const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+
             std::string fmtStr;
 
-            if (!mDisableBras || (itC != c.begin()))
+            bool isFirstElement = (itC == c.begin());
+            bool newLine = !mDisableBras || !isFirstElement;
+            if (newLine)
                 fmtStr = "\n";
 
+            // get current element value
             const auto& val = *itC;
-            if (!is_braceable_v<decltype(val)>)
-                fmtStr += mBraIndent;
-
-            if (!is_braceable_v<C>)
-                fmtStr += mDataIndent;
 
             // this is done ahead to determine comma insertion
             itC++;
 
-            if (!fmtster::internal::is_fmtsterable_v<decltype(val)>)
+            bool isLastElement = (itC == c.end());
+
+            // NOTE: decltype(val) SHOULD be able to be used here, instead of
+            //       typename C::value_type. But for some reason, while the
+            //       verified (printing typeid(val).name() vs typeid(typename
+            //       C::valuetype).name()) types are the same, is_fmtsterable<>
+            //       can't seem to handle the former.
+            if (is_fmtsterable_v<typename C::value_type>)
             {
-            if (fmtster::internal::is_string_v<decltype(val)>)
-                fmtStr += (itC != c.end()) ? "\"{}\"," : "\"{}\"";
-            else
-                fmtStr += (itC != c.end()) ? "{}," : "{}";
-            itFC = fmt::format_to(itFC, fmtStr, val);
+                if (!is_pair_v<simplify_type<decltype(val)> >)
+                    fmtStr += indent;
+
+                fmtStr += isLastElement ? "{:{},{},{},{}}" : "{:{},{},{},{}},";
+                auto pcp = is_pair_v<simplify_type<decltype(val)> > ? "-b" : "";
+                itFC = fmt::format_to(itFC,
+                                      fmtStr,
+                                      EscapeIfJSONString(val),
+                                      mFormatSetting,
+                                      mStyleHelper.mStyle.value,
+                                      pcp,
+                                      mIndentSetting);
             }
             else
             {
-                fmtStr += (itC != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
-                itFC = fmt::format_to(itFC,
-                                       fmtStr,
-                                       fmtster::internal::EscapeIfJSONString(val),
-                                       mFormatSetting,
-                                       mStyleHelper.mStyle.value,
-                                       "",
-                                       mDataIndentSetting);
+                fmtStr += indent;
+
+                if (fmtster::internal::is_string_v<decltype(val)>)
+                    fmtStr += isLastElement ? "\"{}\"" : "\"{}\",";
+                else
+                    fmtStr += isLastElement ? "{}" : "{},";
+                itFC = fmt::format_to(itFC, fmtStr, EscapeIfJSONString(val));
             }
         }
     } // format_loop() (all containers except multimap)
@@ -843,76 +876,79 @@ struct fmt::formatter<T,
     {
         using namespace fmtster::internal;
 
-        auto remainingElements = c.size();
-        if (c.empty())
+        auto itC = c.begin();
+        while (itC != c.end())
         {
-            itFC = fmt::format_to(itFC, " ");
-        }
-        else
-        {
-            auto itCnt = c.begin();
-            while (itCnt != c.end())
+            const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+
+            std::string fmtStr;
+
+            bool isFirstElement = (itC == c.begin());
+            bool newLine = !mDisableBras || !isFirstElement;
+            if (newLine)
+                fmtStr = "\n";
+
+            // output the key
+            const auto& key = itC->first;
+            if (fmtster::internal::is_string_v<decltype(key)>)
+                fmtStr += "{}\"{}\" : ";
+            else
+                fmtStr += "{}{} : ";
+            itFC = fmt::format_to(itFC, fmtStr, indent, EscapeIfJSONString(key));
+
+            // insert each value with the same key into a temp vector to
+            // print
+            std::vector<typename C::mapped_type> vals;
+            do
             {
-                std::string fmtStr;
-                if (!mDisableBras || (itCnt != c.begin()))
-                    fmtStr = "\n";
+                vals.insert(vals.begin(), itC->second);
+                itC++;
+            } while ((itC != c.end()) && (itC->first == key));
 
-                const auto& key = itCnt->first;
-                if (fmtster::internal::is_string_v<decltype(key)>)
-                    fmtStr += "{}\"{}\" : ";
-                else
-                    fmtStr += "{}{} : ";
-                itFC = fmt::format_to(itFC, fmtStr, mDataIndent, EscapeIfJSONString(key));
-
-                // insert each value with the same key into a temp vector to
-                // print
-                std::vector<typename C::mapped_type> vals;
-                do
-                {
-                    vals.insert(vals.begin(), itCnt->second);
-                    itCnt++;
-                } while ((itCnt != c.end()) && (itCnt->first == key));
-
-                fmtStr = (itCnt != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
-                itFC = format_to(itFC,
-                                fmtStr,
-                                vals,
-                                mFormatSetting,
-                                mStyleHelper.mStyle.value,
-                                "",
-                                mDataIndentSetting);
-            }
+            fmtStr = (itC != c.end()) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
+            itFC = format_to(itFC,
+                            fmtStr,
+                            vals,
+                            mFormatSetting,
+                            mStyleHelper.mStyle.value,
+                            "",
+                            mIndentSetting);
         }
     } // format_loop() (multimaps)
 
     template<typename FormatContext>
     auto format(const T& sc, FormatContext& ctx)
     {
+        using fmt::format_to;
         using namespace fmtster::internal;
 
 decipherParms(ctx);
 
         // output opening bracket/brace (if enabled)
-        auto itFC = mDisableBras
-                     ? ctx.out()
-                     : fmt::format_to(ctx.out(), is_braceable_v<T> ? "{{" : "[");
+        auto itFC = ctx.out();
+        if (!mDisableBras)
+        {
+            itFC = format_to(itFC, is_braceable_v<T> ? "{{" : "[");
+            mIndentSetting++;
+        }
 
         const bool empty = (sc.end() == sc.begin());
 
         if (empty && !mDisableBras)
-            itFC = fmt::format_to(itFC, " ");
+        {
+            itFC = fmt::format_to(itFC, is_braceable_v<T> ? " }}" : " ]");
+        }
         else
+        {
             format_loop<FormatContext, T>(sc, itFC);
 
-        // output closing brace
-        if (!mDisableBras)
-        {
-            if (empty)
-                itFC = fmt::format_to(itFC, is_braceable_v<T> ? "}}" : "]");
-            else
+            if (!mDisableBras)
+            {
+                // output closing brace
                 itFC = fmt::format_to(itFC,
-                                       is_braceable_v<T> ? "\n{}}}" : "\n{}]",
-                                       mBraIndent);
+                                      is_braceable_v<T> ? "\n{}}}" : "\n{}]",
+                                      mBraIndent);
+            }
         }
 
         return itFC;
@@ -969,42 +1005,58 @@ struct fmt::formatter<std::pair<T1, T2> >
 
 decipherParms(ctx);
 
-        std::string fmtStr;
-        if (fmtster::internal::is_string_v<T1>)
-            fmtStr = "{}\"{}\" : ";
-        else
-            fmtStr = "{}{} : ";
-        auto itFC = format_to(ctx.out(),
-                            fmtStr,
-                            mDataIndent,
-                            EscapeIfJSONString(p.first));
-        if (!fmtster::internal::is_fmtsterable_v<T2>)
+        // output opening bracket/brace (if enabled)
+        auto itFC = ctx.out();
+        if (!mDisableBras)
         {
-            if (fmtster::internal::is_string_v<T2>)
-                fmtStr = "\"{}\"";
-            else
-                fmtStr = "{}";
+            itFC = format_to(itFC, "{{\n");
+            mIndentSetting++;
+        }
 
+        // WARNING: a pair that doesn't have a string first is not JSON compliant
+
+        // key
+        std::string fmtStr = fmtster::internal::is_string_v<T1>
+                             ? "{}\"{}\" : "
+                             : "{}{} : ";
+        itFC = format_to(ctx.out(),
+                         fmtStr,
+                         mDisableBras ? mBraIndent : mDataIndent,
+                         EscapeIfJSONString(p.first));
+
+        // value
+        if (fmtster::internal::is_fmtsterable_v<T2>)
+        {
             itFC = format_to(itFC,
-                            fmtStr,
-                            EscapeIfJSONString(p.second));
+                             "{:{},{},{},{}}",
+                             p.second,
+                             mFormatSetting,
+                             mStyleHelper.mStyle.value,
+                             "",
+                             mIndentSetting);
         }
         else
         {
+            fmtStr = fmtster::internal::is_string_v<T2>
+                     ? "\"{}\""
+                     : fmtStr = "{}";
             itFC = format_to(itFC,
-                        "{:{},{},{},{}}",
-                        p.second,
-                        mFormatSetting,
-                        (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
-                        "",
-                        mDataIndentSetting);
+                             fmtStr,
+                             EscapeIfJSONString(p.second));
+        }
+
+        // output closing bracket/brace (if enabled)
+        if (!mDisableBras)
+        {
+            itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
         }
 
         return itFC;
     }
 }; // struct fmt::formatter<std::pair<> >
 
-// fmt::formatter<> for std::tuple<> (wraps group of heterogeneous objects known at compile time)
+// fmt::formatter<> for std::tuple<> (wraps group of heterogeneous objects
+// known at compile time)
 template<typename... Ts>
 struct fmt::formatter<std::tuple<Ts...> >
   : fmtster::FmtsterBase
@@ -1016,57 +1068,67 @@ struct fmt::formatter<std::tuple<Ts...> >
 
 decipherParms(ctx);
 
-        // output opening bracket (if enabled)
-        auto itFC = mDisableBras ?
-                     ctx.out() :
-                     fmt::format_to(ctx.out(), "{{");
+        const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+
+        // output opening brace (if enabled)
+        auto itFC = ctx.out();
+        if (!mDisableBras)
+        {
+            itFC = format_to(itFC, "{{");
+            mIndentSetting++;
+        }
+
+        // get number of items in the tuple
         auto count = sizeof...(Ts);
 
         const bool empty = !count;
+
         if (empty && !mDisableBras)
         {
-            itFC = fmt::format_to(itFC, " ");
+            // output space & closing brace at the same time
+            itFC = fmt::format_to(itFC, " }}");
         }
         else
         {
-            ForEachElement(tup,
-                           [&](const auto& elem)
-                           {
-                               std::string fmtStr;
-                               if (!mDisableBras || (count != sizeof...(Ts)))
-                                   fmtStr = "\n";
+            auto fn =
+                [&](const auto& elem)
+                {
+                    std::string fmtStr;
+                    if (!mDisableBras || (count != sizeof...(Ts)))
+                        fmtStr = "\n";
 
-                                if (!fmtster::internal::is_fmtsterable_v<decltype(elem)>)
-                                {
-                                    if (fmtster::internal::is_string_v<decltype(elem)>)
-                                        fmtStr += (--count) ? "\"{}\"," : "\"{}\"";
-                                    else
-                                        fmtStr += (--count) ? "{}," : "{}";
+                    if (fmtster::internal::is_fmtsterable_v<decltype(elem)>)
+                    {
+                        fmtStr += (--count) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
+                        auto pcp = is_pair_v<simplify_type<decltype(elem)> > ? "-b" : "";
+                        itFC = format_to(itFC,
+                                         fmtStr,
+                                         elem,
+                                         mFormatSetting,
+                                         (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
+                                         pcp,
+                                         mIndentSetting);
+                    }
+                    else
+                    {
+                        fmtStr += indent;
 
-                                    itFC = format_to(itFC,
-                                                    fmtStr,
-                                                    EscapeIfJSONString(elem));
-                                }
-                                else
-                                {
-                                    fmtStr += (--count) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
-                                    itFC = format_to(itFC,
-                                                    fmtStr,
-                                                    elem,
-                                                    mFormatSetting,
-                                                    (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
-                                                    "",
-                                                    mDataIndentSetting);
-                                }
-                            });
+                        if (fmtster::internal::is_string_v<decltype(elem)>)
+                            fmtStr += (--count) ? "\"{}\"," : "\"{}\"";
+                        else
+                            fmtStr += (--count) ? "{}," : "{}";
 
-            // output closing brace
+                        itFC = format_to(itFC,
+                                         fmtStr,
+                                         EscapeIfJSONString(elem));
+                    }
+                };
+            ForEachElement(tup, fn);
+
+            // output closing brace (if enabled)
             if (!mDisableBras)
             {
-                if (empty)
-                    itFC = fmt::format_to(itFC, "}");
-                else
-                    itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
+                itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
             }
         }
 

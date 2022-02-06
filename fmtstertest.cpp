@@ -690,22 +690,22 @@ TEST_F(FmtsterTest, pairs)
 {
     string ref = "{\n  \"foo\" : \"bar\"\n}, {\n  \"foobar\" : 7\n}";
     string str = F("{}, {}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
-cout << str << endl;
+cout << "ONE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "\"foo\" : \"bar\", \"foobar\" : 7";
     str = F("{:,,-b}, {:,,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
-cout << str << endl;
+cout << "TWO:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "{\n    \"foo\" : \"bar\"\n  }, {\n    \"foobar\" : 7\n  }";
     str = F("{:,,,1}, {:,,,1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
-cout << str << endl;
+cout << "THREE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "  \"foo\" : \"bar\", \"foobar\" : 7";
     str = F("{:,,-b,1}, {:,,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
-cout << str << endl;
+cout << "FOUR:\n" << str << endl;
     EXPECT_EQ(ref, str);
 }
 
@@ -725,7 +725,9 @@ TEST_F(FmtsterTest, NestedPairs)
         "\"foo\" : {\n"
         "    \"bar\" : \"baz\"\n"
         "}";
-    string str = F("{:,4,1}", make_pair("foo"s, make_pair("bar"s, "baz"s)));
+    fmtster::JSONStyle style;
+    style.tabCount = 4;
+    string str = F("{:,{},-b}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -733,8 +735,6 @@ cout << str << endl;
         "    \"foo\" : {\n"
         "        \"bar\" : \"baz\"\n"
         "    }";
-    fmtster::JSONStyle style;
-    style.tabCount = 4;
     str = F("{:,{},-b,1}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
@@ -845,7 +845,7 @@ TEST_F(FmtsterTest, Tuple)
         make_pair("boolean"s, true));
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:,{},-b,1}", tup, style.value);
+   string str = F("{:,{},-b,1}", tup, style.value);
     string ref =
         R"(    "int" : 25,)" "\n"
         R"(    "string" : "Hello",)" "\n"
@@ -859,7 +859,7 @@ TEST_F(FmtsterTest, Tuple)
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
-    str = F("{:,{},,1}", tup);
+    str = F("{:,{},,1}", tup, style.value);
     ref =
         "{\n"
         R"(        "int" : 25,)" "\n"
@@ -878,7 +878,7 @@ cout << str << endl;
 
 TEST_F(FmtsterTest, Layers)
 {
-    F("{}", fmtster::JSONStyle{});
+//     F("{}", fmtster::JSONStyle{});
 
     // pair
     auto pr = make_pair("key"s, "value"s);
@@ -886,7 +886,7 @@ TEST_F(FmtsterTest, Layers)
     EXPECT_EQ("{\n  \"key\" : \"value\"\n}"s, str);
     str = F("{:,,-b}", pr);
     EXPECT_EQ("\"key\" : \"value\""s, str);
-    str = F("{:,,,-b}", pr);
+    str = F("{:,,,1}", pr);
     EXPECT_EQ("{\n    \"key\" : \"value\"\n  }"s, str);
     str = F("{:,,-b,1}", pr);
     EXPECT_EQ("  \"key\" : \"value\""s, str);
@@ -896,7 +896,7 @@ TEST_F(FmtsterTest, Layers)
     EXPECT_EQ("{\n  \"string\",\n  1,\n  true,\n  3.14\n}"s, str);
     str = F("{:,,-b}", tup);
     EXPECT_EQ("\"string\",\n1,\ntrue,\n3.14"s, str);
-    str = F("{:,,,-b}", tup);
+    str = F("{:,,,1}", tup);
     EXPECT_EQ("{\n    \"string\",\n    1,\n    true,\n    3.14\n  }"s, str);
     str = F("{:,,-b,1}", tup);
     EXPECT_EQ("  \"string\",\n  1,\n  true,\n  3.14"s, str);
@@ -909,7 +909,7 @@ TEST_F(FmtsterTest, Layers)
     str = F("{:,,-b}", mm2);
     EXPECT_EQ("\"mm1\" : [\n  {\n    \"seven\" : 7,\n    \"six\" : 6\n  },\n  {\n    \"one\" : 1,\n    \"three\" : 3,\n    \"two\" : 2\n  }\n],\n\"mm2\" : [\n  {\n    \"five\" : 5,\n    \"four\" : 4\n  }\n]"s,
               str);
-    str = F("{:,,,-b}", mm2);
+    str = F("{:,,,1}", mm2);
     EXPECT_EQ("{\n    \"mm1\" : [\n      {\n        \"seven\" : 7,\n        \"six\" : 6\n      },\n      {\n        \"one\" : 1,\n        \"three\" : 3,\n        \"two\" : 2\n      }\n    ],\n    \"mm2\" : [\n      {\n        \"five\" : 5,\n        \"four\" : 4\n      }\n    ]\n  }"s,
               str);
     str = F("{:,,-b,1}", mm2);
