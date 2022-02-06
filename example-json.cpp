@@ -142,6 +142,14 @@ Personnel GetPersonnel()
 
 int main()
 {
+{
+fmtster::JSONStyle style;
+cout << F("default JSONStyle: {}", style) << endl;
+style.hardTab = true;
+style.tabCount = 1;
+cout << F("modified JSONStyle: {}", style) << endl;
+}
+
     vector<int> v = { 1, 2 };
 //     cout << F("blanks: {}", v) << endl;
 // cout << __LINE__ << endl;

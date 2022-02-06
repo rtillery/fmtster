@@ -235,20 +235,7 @@ fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
 //
 // misc helpers
 //
-// template argument iteration for std::tuple<>
-template<typename F, typename... Ts, std::size_t... Is>
-void ForEachElement(const std::tuple<Ts...>& tup,
-                    F fn,
-                    std::index_sequence<Is...>)
-{
-    (void)(int[]) { 0, ((void)fn(std::get<Is>(tup)), 0)... };
-}
-template<typename F, typename...Ts>
-void ForEachElement(const std::tuple<Ts...>& tup, F fn)
-{
-    ForEachElement(tup, fn, std::make_index_sequence<sizeof...(Ts)>());
-}
-
+// Dummy escape function for all but strings
 template<typename T>
 T EscapeIfJSONString(const T& val)
 {
@@ -604,7 +591,7 @@ struct FmtsterBase
     //  entry to the format() function. It completes the updating of the style
     //  object based on arguments provided, if necessary.
     template<typename FormatContext>
-    void decipherParms(FormatContext& ctx)
+    void resolveArgs(FormatContext& ctx)
     {
         using namespace fmtster::internal;
 
@@ -777,7 +764,7 @@ struct FmtsterBase
             mBraIndent += mStyleHelper.tab;
         mDataIndent = mBraIndent + mStyleHelper.tab;
 
-    } // decipherParms()
+    } // resolveArgs()
 }; // struct FmtterBase
 
 extern unsigned int FmtsterBase::sDefaultFormat;
@@ -922,7 +909,7 @@ struct fmt::formatter<T,
         using fmt::format_to;
         using namespace fmtster::internal;
 
-decipherParms(ctx);
+resolveArgs(ctx);
 
         // output opening bracket/brace (if enabled)
         auto itFC = ctx.out();
@@ -1003,7 +990,7 @@ struct fmt::formatter<std::pair<T1, T2> >
     {
         using namespace fmtster::internal;
 
-decipherParms(ctx);
+resolveArgs(ctx);
 
         // output opening bracket/brace (if enabled)
         auto itFC = ctx.out();
@@ -1066,7 +1053,7 @@ struct fmt::formatter<std::tuple<Ts...> >
     {
         using namespace fmtster::internal;
 
-decipherParms(ctx);
+resolveArgs(ctx);
 
         const auto indent = mDisableBras ? mBraIndent : mDataIndent;
 
@@ -1123,7 +1110,7 @@ decipherParms(ctx);
                                          EscapeIfJSONString(elem));
                     }
                 };
-            ForEachElement(tup, fn);
+            std::apply([&](const auto&... elems){(fn(elems), ...);}, tup);
 
             // output closing brace (if enabled)
             if (!mDisableBras)
@@ -1144,65 +1131,68 @@ struct fmt::formatter<fmtster::JSONStyle>
     template<typename FormatContext>
     auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
     {
-        // @@@ Make this conditional (difficult because it differs from the
-        //     behavior of all the other types).
-        fmtster::FmtsterBase::sDefaultStyleHelper = style;
+        using namespace std::string_literals;
+        using std::make_pair;
 
-        auto it = ctx.out();
 
-        if (mDumpStyle)
-        {
-            using namespace std::string_literals;
-            using std::make_pair;
+// change the default to make the style the default
+mArgData.resize(4, "");
+mNestedArgIndex.resize(4, 0);
+if (mArgData[2].find('s') == std::string::npos)
+    mArgData[2] += "s";
 
-           if (!mDisableBras)
-                it = format_to(it, "{{\n");
+resolveArgs(ctx);
 
-//             const auto tup = std::make_tuple(
-//                 make_pair("cr", style.cr),
-//                 make_pair("lf", style.lf),
-//                 make_pair("hardTab", style.hardTab),
-//                 make_pair("tabCount", style.tabCount),
-//                 make_pair("gapA", style.gapA),
-//                 make_pair("gapB", style.gapB),
-//                 make_pair("gapC", style.gapC),
-//                 make_pair("gap1", style.gap1),
-//                 make_pair("gap2", style.gap2),
-//                 make_pair("gap3", style.gap3),
-//                 make_pair("gap4", style.gap4),
-//                 make_pair("gap5", style.gap5),
-//                 make_pair("gap6", style.gap6),
-//                 make_pair("gap7", style.gap7),
-//                 make_pair("emptyArray", style.emptyArray),
-//                 make_pair("emptyObject", style.emptyObject),
-//                 make_pair("sva", style.sva),
-//                 make_pair("svo", style.svo)
-//             );
-//             it = format_to(it, createFormatString(tup, mDataIndent, false, false), tup);
-it = format_to(it, "  \"cr\" : {},", style.cr);
-it = format_to(it, "  \"lf\" : {},", style.lf);
-it = format_to(it, "  \"hardTab\" : {},", style.hardTab);
-it = format_to(it, "  \"tabCount\" : {},", style.tabCount);
-it = format_to(it, "  \"gapA\" : {:04b},", style.gapA);
-it = format_to(it, "  \"gapB\" : {:04b},", style.gapB);
-it = format_to(it, "  \"gapC\" : {:04b},", style.gapC);
-it = format_to(it, "  \"gap1\" : {:04b},", style.gap1);
-it = format_to(it, "  \"gap2\" : {:04b},", style.gap2);
-it = format_to(it, "  \"gap3\" : {:04b},", style.gap3);
-it = format_to(it, "  \"gap4\" : {:04b},", style.gap4);
-it = format_to(it, "  \"gap5\" : {:04b},", style.gap5);
-it = format_to(it, "  \"gap6\" : {:04b},", style.gap6);
-it = format_to(it, "  \"gap7\" : {:04b},", style.gap7);
-it = format_to(it, "  \"emptyArray\" : {:02b},", style.emptyArray);
-it = format_to(it, "  \"emptyObject\" : {:02b},", style.emptyObject);
-it = format_to(it, "  \"sva\" : {:02b},", style.sva);
-it = format_to(it, "  \"svo\" : {:02b}", style.svo);
+        auto itFC = ctx.out();
 
-            if (!mDisableBras)
-                it = format_to(it, "\n{}}}", mBraIndent);
-        }
+        const auto tup = std::make_tuple(
+            make_pair("cr"s, style.cr),
+            make_pair("lf"s, style.lf),
+            make_pair("hardTab"s, style.hardTab),
+            make_pair("tabCount"s, style.tabCount),
+            make_pair("gapA"s, style.gapA),
+            make_pair("gapB"s, style.gapB),
+            make_pair("gapC"s, style.gapC),
+            make_pair("gap1"s, style.gap1),
+            make_pair("gap2"s, style.gap2),
+            make_pair("gap3"s, style.gap3),
+            make_pair("gap4"s, style.gap4),
+            make_pair("gap5"s, style.gap5),
+            make_pair("gap6"s, style.gap6),
+            make_pair("gap7"s, style.gap7),
+            make_pair("emptyArray"s, style.emptyArray),
+            make_pair("emptyObject"s, style.emptyObject),
+            make_pair("sva"s, style.sva),
+            make_pair("svo"s, style.svo)
+        );
+        auto pcp = mDisableBras ? "-b" : "";
+        itFC = fmt::format_to(itFC,
+                              "{:{},{},{},{}}",
+                              tup,
+                              mFormatSetting,
+                              mStyleHelper.mStyle.value,
+                              pcp,
+                              mIndentSetting);
+// it = format_to(it, "  \"cr\" : {},", style.cr);
+// it = format_to(it, "  \"lf\" : {},", style.lf);
+// it = format_to(it, "  \"hardTab\" : {},", style.hardTab);
+// it = format_to(it, "  \"tabCount\" : {},", style.tabCount);
+// it = format_to(it, "  \"gapA\" : {:04b},", style.gapA);
+// it = format_to(it, "  \"gapB\" : {:04b},", style.gapB);
+// it = format_to(it, "  \"gapC\" : {:04b},", style.gapC);
+// it = format_to(it, "  \"gap1\" : {:04b},", style.gap1);
+// it = format_to(it, "  \"gap2\" : {:04b},", style.gap2);
+// it = format_to(it, "  \"gap3\" : {:04b},", style.gap3);
+// it = format_to(it, "  \"gap4\" : {:04b},", style.gap4);
+// it = format_to(it, "  \"gap5\" : {:04b},", style.gap5);
+// it = format_to(it, "  \"gap6\" : {:04b},", style.gap6);
+// it = format_to(it, "  \"gap7\" : {:04b},", style.gap7);
+// it = format_to(it, "  \"emptyArray\" : {:02b},", style.emptyArray);
+// it = format_to(it, "  \"emptyObject\" : {:02b},", style.emptyObject);
+// it = format_to(it, "  \"sva\" : {:02b},", style.sva);
+// it = format_to(it, "  \"svo\" : {:02b}", style.svo);
 
-        return it;
+        return itFC;
     }
 };
 
