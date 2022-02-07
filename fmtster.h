@@ -478,12 +478,17 @@ public:
     string tab = "  ";  // expanded tab
 
     JSONStyle mStyle;
+    VALUE_T mLastStyleValue = 0;
 
     void updateExpansions()
     {
-        tab = mStyle.hardTab
-              ? string(mStyle.tabCount, '\t')
-              : string(mStyle.tabCount, ' ');
+        if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
+        {
+            tab = mStyle.hardTab
+                  ? string(mStyle.tabCount, '\t')
+                  : string(mStyle.tabCount, ' ');
+            mLastStyleValue = mStyle.value;
+        }
     }
 
     JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
@@ -602,6 +607,7 @@ struct FmtsterBase
     template<typename FormatContext>
     void resolveArgs(FormatContext& ctx)
     {
+        using namespace std::string_literals;
         using fmt::format_to;
         using namespace fmtster::internal;
 
@@ -631,7 +637,7 @@ struct FmtsterBase
                     }
                     else
                     {
-                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
+                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
                     }
                 },
                 formatArg
@@ -666,7 +672,7 @@ struct FmtsterBase
                     }
                     else
                     {
-                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
+                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
                     }
                 },
                 styleArg
@@ -700,7 +706,7 @@ struct FmtsterBase
                     }
                     else
                     {
-                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
+                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
                     }
                 },
                 pcpArg);
@@ -727,7 +733,7 @@ struct FmtsterBase
                     }
                     else
                     {
-                        throw fmt::format_error(std::string("unsupported nested argument type: ") + typeid(value).name());
+                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
                     }
                 },
                 indentArg);
@@ -775,6 +781,8 @@ struct FmtsterBase
             }
         }
 
+        mStyleHelper.updateExpansions();
+
         // expand indenting
         mBraIndent.clear();
         for (auto i = mIndentSetting; i; --i)
@@ -785,17 +793,6 @@ struct FmtsterBase
 
 extern unsigned int FmtsterBase::sDefaultFormat;
 extern internal::JSONStyleHelper FmtsterBase::sDefaultStyleHelper;
-
-template<typename T>
-constexpr bool HasFmtsterBaseHelper()
-{ return false; }
-template<>
-constexpr bool HasFmtsterBaseHelper<FmtsterBase>()
-{ return true; }
-
-template<typename T>
-constexpr bool HasFmtsterBase()
-{ return HasFmtsterBaseHelper<fmt::formatter<T> >(); }
 
 } // namespace fmtster
 

@@ -548,6 +548,19 @@ TEST_F(FmtsterTest, Reference)
     cout << '\n' << endl;
 }
 
+std::string ReplaceString(std::string subject,
+                          const std::string& search,
+                          const std::string& replace)
+{
+    size_t pos = 0;
+    while ((pos = subject.find(search, pos)) != std::string::npos)
+    {
+        subject.replace(pos, search.length(), replace);
+        pos += replace.length();
+    }
+    return subject;
+}
+
 TEST_F(FmtsterTest, JSONStyle)
 {
     string REF =
@@ -576,6 +589,17 @@ TEST_F(FmtsterTest, JSONStyle)
     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\nbase default JSONStyle: {}", REF, str);
 
     str = F("{}", fmtster::FmtsterBase::sDefaultStyleHelper.mStyle);
+    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+
+    style.hardTab = true;
+    style.tabCount = 1;
+    REF = ReplaceString(REF, "\"hardTab\" : false", "\"hardTab\" : true");
+    REF = ReplaceString(REF, "\"tabCount\" : 2", "\"tabCount\" : 1");
+    str = F("{}", style);
+    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+
+    REF = ReplaceString(REF, "  ", "\t");
+    str = F("{:,{}}", style, style.value);
     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
