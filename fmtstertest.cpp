@@ -548,6 +548,38 @@ TEST_F(FmtsterTest, Reference)
     cout << '\n' << endl;
 }
 
+TEST_F(FmtsterTest, JSONStyle)
+{
+    string REF =
+        "{\n"
+        "  \"cr\" : false,\n"
+        "  \"lf\" : true,\n"
+        "  \"hardTab\" : false,\n"
+        "  \"tabCount\" : 2,\n"
+        "  \"gapA\" : 14,\n"
+        "  \"gapB\" : 2,\n"
+        "  \"gapC\" : 2,\n"
+        "  \"gap1\" : 14,\n"
+        "  \"gap2\" : 0,\n"
+        "  \"gap3\" : 2,\n"
+        "  \"gap4\" : 14,\n"
+        "  \"gap5\" : 0,\n"
+        "  \"gap6\" : 2,\n"
+        "  \"gap7\" : 8,\n"
+        "  \"emptyArray\" : 2,\n"
+        "  \"emptyObject\" : 2,\n"
+        "  \"sva\" : 1,\n"
+        "  \"svo\" : 1\n"
+        "}";
+    fmtster::JSONStyle style;
+//     auto str = F("{}", style);
+//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\nbase default JSONStyle: {}", REF, str);
+
+string str;
+    str = F("{:,,!}", make_tuple());
+    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ninitial default str: {}", REF, str);
+}
+
 // value container tests
 
 ARRAYCONTAINERTESTS()

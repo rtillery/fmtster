@@ -461,6 +461,11 @@ public:
     JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value)
       : value(val)
     {}
+
+    operator internal::VALUE_T() const
+    {
+        return value;
+    }
 };
 
 namespace internal
@@ -510,6 +515,11 @@ public:
 // base class that handles formatting
 struct FmtsterBase
 {
+    static constexpr size_t FORMAT_PARM_INDEX = 0;
+    static constexpr size_t STYLE_PARM_INDEX = 1;
+    static constexpr size_t PER_CALL_PARM_INDEX = 2;
+    static constexpr size_t INDENT_PARM_INDEX = 3;
+
     static unsigned int sDefaultFormat;
     static internal::JSONStyleHelper sDefaultStyleHelper;
 
@@ -591,8 +601,9 @@ struct FmtsterBase
     //  entry to the format() function. It completes the updating of the style
     //  object based on arguments provided, if necessary.
     template<typename FormatContext>
-    void resolveArgs(FormatContext& ctx)
+    auto resolveArgs(FormatContext& ctx)
     {
+        using fmt::format_to;
         using namespace fmtster::internal;
 
         // ensure vectors are large enough for unchecked processing below
@@ -604,7 +615,6 @@ struct FmtsterBase
         //
         // format
         //
-        const size_t FORMAT_PARM_INDEX = 0;
         if (mNestedArgIndex[FORMAT_PARM_INDEX])
         {
             auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_PARM_INDEX]);
@@ -640,7 +650,6 @@ struct FmtsterBase
         //
         // style
         //
-        const size_t STYLE_PARM_INDEX = 1;
         if (mNestedArgIndex[STYLE_PARM_INDEX])
         {
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_PARM_INDEX]);
@@ -652,7 +661,7 @@ struct FmtsterBase
                     //  at run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
-                    if constexpr (std::is_integral_v<fmtster::internal::simplify_type<decltype(value)> >)
+                    if constexpr (std::is_integral_v<simplify_type<decltype(value)> >)
                     {
                         return value;
                     }
@@ -678,7 +687,6 @@ struct FmtsterBase
         //
         // perm call parms
         //
-        const size_t PER_CALL_PARM_INDEX = 2;
         string pcpSetting;
         if (mNestedArgIndex[PER_CALL_PARM_INDEX])
         {
@@ -708,7 +716,6 @@ struct FmtsterBase
         //
         // indent
         //
-        const size_t INDENT_PARM_INDEX = 3;
         if (mNestedArgIndex[INDENT_PARM_INDEX])
         {
             auto indentArg = ctx.arg(mNestedArgIndex[INDENT_PARM_INDEX]);
@@ -742,16 +749,32 @@ struct FmtsterBase
         // parse those parms
         if (!pcpSetting.empty())
         {
+cout << __LINE__ << " pcpSetting: " << pcpSetting << endl;
             bool negate = false;
             for (const auto c : pcpSetting)
             {
                 switch (c)
                 {
-                case 'b': mDisableBras = negate; break;
-                case 'f': sDefaultFormat = mFormatSetting; break;
-                case 's': sDefaultStyleHelper = mStyleHelper; break;
-                case '!': mDumpStyle = true; break;
-                default: ;
+                case 'b':
+                    mDisableBras = negate;
+                    break;
+
+                case 'f':
+                    if (!negate)
+                        sDefaultFormat = mFormatSetting;
+                    break;
+
+                case 's':
+                    if (!negate)
+                        sDefaultStyleHelper = mStyleHelper;
+                    break;
+
+                case '!':
+                    mDumpStyle = !negate;
+                    break;
+
+                default:
+                    ;
                 }
 
                 negate = (c == '-');
@@ -764,6 +787,20 @@ struct FmtsterBase
             mBraIndent += mStyleHelper.tab;
         mDataIndent = mBraIndent + mStyleHelper.tab;
 
+        auto itFC = ctx.out();
+        if (mDumpStyle)
+        {
+cout << __LINE__ << endl;
+            itFC = format_to(itFC,
+                             "{:{},{},{},{}}",
+                             sDefaultStyleHelper.mStyle,
+                             mFormatSetting,
+                             mStyleHelper.mStyle.value,
+                             mArgData[PER_CALL_PARM_INDEX].c_str(),
+                             mIndentSetting);
+        }
+
+        return itFC;
     } // resolveArgs()
 }; // struct FmtterBase
 
@@ -909,32 +946,33 @@ struct fmt::formatter<T,
         using fmt::format_to;
         using namespace fmtster::internal;
 
-resolveArgs(ctx);
-
-        // output opening bracket/brace (if enabled)
-        auto itFC = ctx.out();
-        if (!mDisableBras)
+        auto itFC = resolveArgs(ctx);
+        if (!mDumpStyle)
         {
-            itFC = format_to(itFC, is_braceable_v<T> ? "{{" : "[");
-            mIndentSetting++;
-        }
-
-        const bool empty = (sc.end() == sc.begin());
-
-        if (empty && !mDisableBras)
-        {
-            itFC = fmt::format_to(itFC, is_braceable_v<T> ? " }}" : " ]");
-        }
-        else
-        {
-            format_loop<FormatContext, T>(sc, itFC);
-
+            // output opening bracket/brace (if enabled)
             if (!mDisableBras)
             {
-                // output closing brace
-                itFC = fmt::format_to(itFC,
-                                      is_braceable_v<T> ? "\n{}}}" : "\n{}]",
-                                      mBraIndent);
+                itFC = format_to(itFC, is_braceable_v<T> ? "{{" : "[");
+                mIndentSetting++;
+            }
+
+            const bool empty = (sc.end() == sc.begin());
+
+            if (empty && !mDisableBras)
+            {
+                itFC = format_to(itFC, is_braceable_v<T> ? " }}" : " ]");
+            }
+            else
+            {
+                format_loop<FormatContext, T>(sc, itFC);
+
+                if (!mDisableBras)
+                {
+                    // output closing brace
+                    itFC = format_to(itFC,
+                                    is_braceable_v<T> ? "\n{}}}" : "\n{}]",
+                                    mBraIndent);
+                }
             }
         }
 
@@ -988,54 +1026,56 @@ struct fmt::formatter<std::pair<T1, T2> >
     template<typename FormatContext>
     auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
     {
+        using fmt::format_to;
         using namespace fmtster::internal;
 
-resolveArgs(ctx);
-
-        // output opening bracket/brace (if enabled)
-        auto itFC = ctx.out();
-        if (!mDisableBras)
+        auto itFC = resolveArgs(ctx);
+        if (!mDumpStyle)
         {
-            itFC = format_to(itFC, "{{\n");
-            mIndentSetting++;
-        }
+            // output opening bracket/brace (if enabled)
+            if (!mDisableBras)
+            {
+                itFC = format_to(itFC, "{{\n");
+                mIndentSetting++;
+            }
 
-        // WARNING: a pair that doesn't have a string first is not JSON compliant
+            // WARNING: a pair that doesn't have a string first is not JSON compliant
 
-        // key
-        std::string fmtStr = fmtster::internal::is_string_v<T1>
-                             ? "{}\"{}\" : "
-                             : "{}{} : ";
-        itFC = format_to(ctx.out(),
-                         fmtStr,
-                         mDisableBras ? mBraIndent : mDataIndent,
-                         EscapeIfJSONString(p.first));
+            // key
+            std::string fmtStr = fmtster::internal::is_string_v<T1>
+                                ? "{}\"{}\" : "
+                                : "{}{} : ";
+            itFC = format_to(ctx.out(),
+                            fmtStr,
+                            mDisableBras ? mBraIndent : mDataIndent,
+                            EscapeIfJSONString(p.first));
 
-        // value
-        if (fmtster::internal::is_fmtsterable_v<T2>)
-        {
-            itFC = format_to(itFC,
-                             "{:{},{},{},{}}",
-                             p.second,
-                             mFormatSetting,
-                             mStyleHelper.mStyle.value,
-                             "",
-                             mIndentSetting);
-        }
-        else
-        {
-            fmtStr = fmtster::internal::is_string_v<T2>
-                     ? "\"{}\""
-                     : fmtStr = "{}";
-            itFC = format_to(itFC,
-                             fmtStr,
-                             EscapeIfJSONString(p.second));
-        }
+            // value
+            if (fmtster::internal::is_fmtsterable_v<T2>)
+            {
+                itFC = format_to(itFC,
+                                "{:{},{},{},{}}",
+                                p.second,
+                                mFormatSetting,
+                                mStyleHelper.mStyle.value,
+                                "",
+                                mIndentSetting);
+            }
+            else
+            {
+                fmtStr = fmtster::internal::is_string_v<T2>
+                        ? "\"{}\""
+                        : fmtStr = "{}";
+                itFC = format_to(itFC,
+                                fmtStr,
+                                EscapeIfJSONString(p.second));
+            }
 
-        // output closing bracket/brace (if enabled)
-        if (!mDisableBras)
-        {
-            itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
+            // output closing bracket/brace (if enabled)
+            if (!mDisableBras)
+            {
+                itFC = format_to(itFC, "\n{}}}", mBraIndent);
+            }
         }
 
         return itFC;
@@ -1051,71 +1091,75 @@ struct fmt::formatter<std::tuple<Ts...> >
     template<typename FormatContext>
     auto format(const std::tuple<Ts...>& tup, FormatContext& ctx)
     {
+        using fmt::format_to;
         using namespace fmtster::internal;
 
-resolveArgs(ctx);
-
-        const auto indent = mDisableBras ? mBraIndent : mDataIndent;
-
-        // output opening brace (if enabled)
-        auto itFC = ctx.out();
-        if (!mDisableBras)
+cout << __LINE__ << endl;
+        auto itFC = resolveArgs(ctx);
+cout << __LINE__ << endl;
+        if (!mDumpStyle)
         {
-            itFC = format_to(itFC, "{{");
-            mIndentSetting++;
-        }
+            const auto indent = mDisableBras ? mBraIndent : mDataIndent;
 
-        // get number of items in the tuple
-        auto count = sizeof...(Ts);
-
-        const bool empty = !count;
-
-        if (empty && !mDisableBras)
-        {
-            // output space & closing brace at the same time
-            itFC = fmt::format_to(itFC, " }}");
-        }
-        else
-        {
-            auto fn =
-                [&](const auto& elem)
-                {
-                    std::string fmtStr;
-                    if (!mDisableBras || (count != sizeof...(Ts)))
-                        fmtStr = "\n";
-
-                    if (fmtster::internal::is_fmtsterable_v<decltype(elem)>)
-                    {
-                        fmtStr += (--count) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
-                        auto pcp = is_pair_v<simplify_type<decltype(elem)> > ? "-b" : "";
-                        itFC = format_to(itFC,
-                                         fmtStr,
-                                         elem,
-                                         mFormatSetting,
-                                         (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
-                                         pcp,
-                                         mIndentSetting);
-                    }
-                    else
-                    {
-                        fmtStr += indent;
-
-                        if (fmtster::internal::is_string_v<decltype(elem)>)
-                            fmtStr += (--count) ? "\"{}\"," : "\"{}\"";
-                        else
-                            fmtStr += (--count) ? "{}," : "{}";
-
-                        itFC = format_to(itFC,
-                                         fmtStr,
-                                         EscapeIfJSONString(elem));
-                    }
-                };
-            std::apply([&](const auto&... elems){(fn(elems), ...);}, tup);
-
-            // output closing brace (if enabled)
+            // output opening brace (if enabled)
             if (!mDisableBras)
             {
-                itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
+                itFC = format_to(itFC, "{{");
+                mIndentSetting++;
+            }
+
+            // get number of items in the tuple
+            auto count = sizeof...(Ts);
+
+            const bool empty = !count;
+
+            if (empty && !mDisableBras)
+            {
+                // output space & closing brace at the same time
+                itFC = format_to(itFC, " }}");
+            }
+            else
+            {
+                auto fn =
+                    [&](const auto& elem)
+                    {
+                        std::string fmtStr;
+                        if (!mDisableBras || (count != sizeof...(Ts)))
+                            fmtStr = "\n";
+
+                        if (fmtster::internal::is_fmtsterable_v<decltype(elem)>)
+                        {
+                            fmtStr += (--count) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
+                            auto pcp = is_pair_v<simplify_type<decltype(elem)> > ? "-b" : "";
+                            itFC = format_to(itFC,
+                                            fmtStr,
+                                            elem,
+                                            mFormatSetting,
+                                            (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
+                                            pcp,
+                                            mIndentSetting);
+                        }
+                        else
+                        {
+                            fmtStr += indent;
+
+                            if (fmtster::internal::is_string_v<decltype(elem)>)
+                                fmtStr += (--count) ? "\"{}\"," : "\"{}\"";
+                            else
+                                fmtStr += (--count) ? "{}," : "{}";
+
+                            itFC = format_to(itFC,
+                                            fmtStr,
+                                            EscapeIfJSONString(elem));
+                        }
+                    };
+                std::apply([&](const auto&... elems){(fn(elems), ...);}, tup);
+
+                // output closing brace (if enabled)
+                if (!mDisableBras)
+                {
+                    itFC = format_to(itFC, "\n{}}}", mBraIndent);
+                }
             }
         }
 
@@ -1134,16 +1178,15 @@ struct fmt::formatter<fmtster::JSONStyle>
         using namespace std::string_literals;
         using std::make_pair;
 
+        // change the per-call-parms to disable dumping the style
+        mArgData.resize(4, "");
+        mNestedArgIndex.resize(4, 0);
+        mArgData[PER_CALL_PARM_INDEX] += "-!";
 
-// change the default to make the style the default
-mArgData.resize(4, "");
-mNestedArgIndex.resize(4, 0);
-if (mArgData[2].find('s') == std::string::npos)
-    mArgData[2] += "s";
+        auto itFC = resolveArgs(ctx);
+cout << __LINE__ << endl;
 
-resolveArgs(ctx);
-
-        auto itFC = ctx.out();
+        // dump, regardless of mDumpStyle value
 
         const auto tup = std::make_tuple(
             make_pair("cr"s, style.cr),
@@ -1167,30 +1210,12 @@ resolveArgs(ctx);
         );
         auto pcp = mDisableBras ? "-b" : "";
         itFC = fmt::format_to(itFC,
-                              "{:{},{},{},{}}",
-                              tup,
-                              mFormatSetting,
-                              mStyleHelper.mStyle.value,
-                              pcp,
-                              mIndentSetting);
-// it = format_to(it, "  \"cr\" : {},", style.cr);
-// it = format_to(it, "  \"lf\" : {},", style.lf);
-// it = format_to(it, "  \"hardTab\" : {},", style.hardTab);
-// it = format_to(it, "  \"tabCount\" : {},", style.tabCount);
-// it = format_to(it, "  \"gapA\" : {:04b},", style.gapA);
-// it = format_to(it, "  \"gapB\" : {:04b},", style.gapB);
-// it = format_to(it, "  \"gapC\" : {:04b},", style.gapC);
-// it = format_to(it, "  \"gap1\" : {:04b},", style.gap1);
-// it = format_to(it, "  \"gap2\" : {:04b},", style.gap2);
-// it = format_to(it, "  \"gap3\" : {:04b},", style.gap3);
-// it = format_to(it, "  \"gap4\" : {:04b},", style.gap4);
-// it = format_to(it, "  \"gap5\" : {:04b},", style.gap5);
-// it = format_to(it, "  \"gap6\" : {:04b},", style.gap6);
-// it = format_to(it, "  \"gap7\" : {:04b},", style.gap7);
-// it = format_to(it, "  \"emptyArray\" : {:02b},", style.emptyArray);
-// it = format_to(it, "  \"emptyObject\" : {:02b},", style.emptyObject);
-// it = format_to(it, "  \"sva\" : {:02b},", style.sva);
-// it = format_to(it, "  \"svo\" : {:02b}", style.svo);
+                            "{:{},{},{},{}}",
+                            tup,
+                            mFormatSetting,
+                            mStyleHelper.mStyle.value,
+                            pcp,
+                            mIndentSetting);
 
         return itFC;
     }
