@@ -572,12 +572,11 @@ TEST_F(FmtsterTest, JSONStyle)
         "  \"svo\" : 1\n"
         "}";
     fmtster::JSONStyle style;
-//     auto str = F("{}", style);
-//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\nbase default JSONStyle: {}", REF, str);
+    auto str = F("{}", style);
+    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\nbase default JSONStyle: {}", REF, str);
 
-string str;
-    str = F("{:,,!}", make_tuple());
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ninitial default str: {}", REF, str);
+    str = F("{}", fmtster::FmtsterBase::sDefaultStyleHelper.mStyle);
+    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
 // value container tests
