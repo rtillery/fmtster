@@ -114,9 +114,9 @@ inline constexpr bool has_ ## TYPE ## _v = has_ ## TYPE<Ts...>::value
 // macro to create is_ID<> templates (also creates is_ID_v<> helper)
 //   COND provides the conditional value used to check traits
 //
-// NOTE 1: Any spaces in the CONDition argument are misinterpreted by the
-//         macro parser, so use of parentheses around this argument is
-//         recommended.
+// NOTE 1: Any spaces or angle brackets (greater-than or less-than) in the
+//         CONDition argument are misinterpreted by the parser, so use of
+//         parentheses around this argument is recommended.
 // NOTE 2: CONDition _can_ be a logical grouping of xxx_v<> values, but it
 //         appears that all of these are evaluated, making some combinations
 //         fail before the SFINAE can kick in. std::conjunction_v<> &
@@ -166,18 +166,6 @@ struct has_operator_index<
 //
 // is_ID<> declarations
 //
-// template<typename T, typename = void>
-// struct is_string
-//   : false_type
-// {};
-// template<class T, class Traits, class Alloc>
-// struct is_string<std::basic_string<T, Traits, Alloc>, void>
-//   : true_type
-// {};
-// template<class T, template<typename, typename, typename> class STRING>
-// struct is_string<T, STRING<T, std::char_traits<T>, std::allocator<T> > >
-//   : true_type
-// {};
 template <typename T>
 using is_string = std::is_constructible<std::string, T>;
 template<typename T>
@@ -399,9 +387,14 @@ struct MeasureJSONStyle JSONSTYLESTRUCT;
 
 // If well packed, the style structure will fit into 64 bits, but if not, we
 // can use 128 bits.
-template <size_t bytes>
+template<size_t bytes>
 using VALUE_TYPE =
-    std::conditional_t<(bytes <= 8), uint64_t, std::conditional_t<(bytes > 8) && (bytes <= 16), __uint128_t, void> >;
+    std::conditional_t<(bytes <= 8),
+                       uint64_t,
+                       std::conditional_t<(bytes > 8) && (bytes <= 16),
+                                          __uint128_t,
+                                          void>
+                      >;
 using VALUE_T = VALUE_TYPE<sizeof(MeasureJSONStyle)>;
 
 // used to define the DEFAULTJSONCONFIG before use as default value (format
@@ -667,17 +660,20 @@ public:
                     //  run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
-                    if constexpr (std::is_integral_v<simplify_type<decltype(value)> >)
+                    using val_t = simplify_type<decltype(value)>;
+                    if constexpr (std::is_integral_v<val_t>)
                     {
                         return value;
                     }
-                    else if constexpr (internal::is_string_v<simplify_type<decltype(value)> >)
+                    else if constexpr (internal::is_string_v<val_t>)
                     {
                         return FormatToValue(value);
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
+                        throw
+                            fmt::format_error("unsupported nested argument type: "s
+                                              + typeid(value).name());
                     }
                 },
                 formatArg
@@ -725,8 +721,7 @@ public:
         }
         else if(!mArgData[STYLE_ARG_INDEX].empty())
         {
-            auto styleSetting =
-                ToValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
+            auto styleSetting = ToValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
             mJSONStyleHelper = internal::JSONStyleHelper(styleSetting);
         }
         else
@@ -790,7 +785,8 @@ public:
         }
         else if (!mArgData[INDENT_ARG_INDEX].empty())
         {
-            mIndentSetting = ToValue<decltype(mIndentSetting)>(mArgData[INDENT_ARG_INDEX]);
+            mIndentSetting =
+                ToValue<decltype(mIndentSetting)>(mArgData[INDENT_ARG_INDEX]);
         }
         else
         {
