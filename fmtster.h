@@ -278,10 +278,9 @@ string EscapeIfJSONString(const string& strIn)
     return strOut;
 } // EscapeIfJSONString()
 
-template<typename T>
-T FormatToValue(const char* sz)
+int FormatToValue(const char* const sz)
 {
-    T format = -1;
+    int format = -1;
     if (sz)
     {
         const auto c0 = *sz;
@@ -293,23 +292,20 @@ T FormatToValue(const char* sz)
     }
     return format;
 }
-template<typename T>
-T FormatToValue(const string& str)
+int FormatToValue(const string& str)
 {
-    return FormatToValue<T>(str.c_str());
+    return FormatToValue(str.c_str());
 }
-template<typename T>
-T FormatToValue(__int128_t i)
+int FormatToValue(__int128_t i)
 {
     if (i != 0)
         throw fmt::format_error(F("unsupported format parameter: \"{}\"",
                                   i));
     return i;
 }
-template<typename T>
-T FormatToValue(const fmt::basic_string_view<char>& str)
+int FormatToValue(const fmt::basic_string_view<char>& str)
 {
-    return FormatToValue<T>(str.data);
+    return FormatToValue(str.data());
 }
 
 template<typename T>
@@ -677,7 +673,7 @@ public:
                     }
                     else if constexpr (internal::is_string_v<simplify_type<decltype(value)> >)
                     {
-                        return FormatToValue<decltype(mFormatSetting)>(value);
+                        return FormatToValue(value);
                     }
                     else
                     {
@@ -691,7 +687,7 @@ public:
         }
         else if(!mArgData[FORMAT_ARG_INDEX].empty())
         {
-            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(mArgData[FORMAT_ARG_INDEX]);
+            mFormatSetting = FormatToValue(mArgData[FORMAT_ARG_INDEX]);
         }
         else
         {
