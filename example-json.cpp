@@ -77,33 +77,68 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         //  main(), but this to illustrates use of the fmt::format_to() call
         //  and care that needs to be taken with JSON commas
 
-        auto itOut = mDisableBras ?
-                     ctx.out() :
-                     fmt::format_to(ctx.out(), "{{\n");
+        resolveArgs(ctx);
 
-        const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
-                                        mFormatSetting,
-                                        mStyleHelper.mStyle.value,
-                                        "",
-                                        mIndentSetting);
-        const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
-        itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
+        auto itFC = ctx.out();
+
+        const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+
+        // output opening brace (if enabled)
+        if (!mDisableBras)
+        {
+            itFC = format_to(itFC, "{{\n{}", mDataIndent);
+            mIndentSetting++;
+        }
+
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},",
+                         mp("name"s, p.name),
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         "",
+                         mIndentSetting);
+
+        // Note that the last entry's format string below does not end a comma
 
         // @@@ TODO: Wrap this section for use with C++20
         stringstream ss;
         auto t = ex_clock_t::to_time_t(p.birthdate);
         auto tm = *std::localtime(&t);
         ss << std::put_time(&tm, "%x");
-        itOut = format_to(itOut, FMTSTR, mp("birthdate"s, ss.str()));
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},",
+                         mp("birthdate"s, ss.str()),
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         "",
+                         mIndentSetting);
 
-        itOut = format_to(itOut, FMTSTR, mp("salary"s, p.salary));
-        itOut = format_to(itOut, FMTSTR, mp("phones"s, p.phones));
-        itOut = format_to(itOut, FMTSTR_NOCOMMA, mp("family"s, p.family));
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},",
+                         mp("salary"s, p.salary),
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         "",
+                         mIndentSetting);
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},",
+                         mp("phones"s, p.phones),
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         "",
+                         mIndentSetting);
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}}",
+                         mp("family"s, p.family),
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         "",
+                         mIndentSetting);
 
         if (!mDisableBras)
-            itOut = fmt::format_to(itOut, "\n}}");
+            itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
 
-        return itOut;
+        return itFC;
     }
 };
 
@@ -142,76 +177,69 @@ Personnel GetPersonnel()
 
 int main()
 {
-{
-fmtster::JSONStyle style;
-cout << F("default JSONStyle: {}", style) << endl;
-style.hardTab = true;
-style.tabCount = 1;
-cout << F("modified JSONStyle: {}", style) << endl;
-}
-
     vector<int> v = { 1, 2 };
-//     cout << F("blanks: {}", v) << endl;
-// cout << __LINE__ << endl;
+    cout << F("blanks: {}", v) << endl;
 
-//     cout << F("explicit default style as direct number: {:,0}", v) << endl;
+    cout << F("explicit default style as direct number: {:,0}", v) << endl;
 
 fmtster::JSONStyle style;
 style.tabCount = 8;
     cout << F("8 char tabs: {:,{}}", v, style.value) << endl;
 
-//     cout << F("braceless: {:,,-b}", v) << endl;
+    cout << F("braceless: {:,,-b}", v) << endl;
 
-//     cout << F("Indent 2 units: {:,,,2}", v) << endl;
+    cout << F("Indent 2 units: {:,,,2}", v) << endl;
 
-//     // Based on https://json.org/example.html
-//     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
-//     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
-//                        mp("GlossSeeAlso"s, GlossSeeAlso));
-//     auto GlossEntry = mt(mp("ID"s, "SGML"s),
-//                          mp("SortAs"s, "SGML"s),
-//                          mp("GlossTerm"s, "Standard Generalized Markup Language"s),
-//                          mp("Acronym"s, "SGML"s),
-//                          mp("Abbrev"s, "ISO 8879:1986"s),
-//                          mp("GlossDef"s, GlossDef),
-//                          mp("GlossSee"s, "markup"s));
-//     auto GlossList = mp("GlossEntry"s, GlossEntry);
-//     auto GlossDiv = mt(mp("title"s, "S"s),
-//                        mp("GlossList"s, GlossList));
-//     auto glossary = mt(mp("title"s, "example glossary"s),
-//                        mp("GlossDiv"s, GlossDiv));
-//     auto obj = mt(mp("glossary"s, glossary));
-//     cout << F("{}", obj) << endl;
-
-
-//     cout << "\n\n" << endl;
+    // Based on https://json.org/example.html
+    auto GlossSeeAlso = vector<string>{ "GML", "XML" };
+    auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
+                       mp("GlossSeeAlso"s, GlossSeeAlso));
+    auto GlossEntry = mt(mp("ID"s, "SGML"s),
+                         mp("SortAs"s, "SGML"s),
+                         mp("GlossTerm"s, "Standard Generalized Markup Language"s),
+                         mp("Acronym"s, "SGML"s),
+                         mp("Abbrev"s, "ISO 8879:1986"s),
+                         mp("GlossDef"s, GlossDef),
+                         mp("GlossSee"s, "markup"s));
+    auto GlossList = mp("GlossEntry"s, GlossEntry);
+    auto GlossDiv = mt(mp("title"s, "S"s),
+                       mp("GlossList"s, GlossList));
+    auto glossary = mt(mp("title"s, "example glossary"s),
+                       mp("GlossDiv"s, GlossDiv));
+    auto obj = mt(mp("glossary"s, glossary));
+    cout << F("{}", obj) << endl;
 
 
-//     string buildAJSON = "{\n";
-
-//     size_t personNumber = 0;
-//     for (auto person : GetPersonnel())
-//         cout << F("{}:\n{:,1,,1}\n", personNumber++, person) << endl;
+    cout << "\n\n" << endl;
 
 
-//     cout << "\n\n" << endl;
+    string buildAJSON = "{\n";
+
+    size_t personNumber = 0;
+    for (auto person : GetPersonnel())
+        cout << F("{} : {}\n", personNumber++, person) << endl;
 
 
-//     fmtster::JSONStyle style;
-//     style.config().tabCount = 4;
-//     cout << F("style: {}\n\n", style) << endl;
-//     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-//     try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-//     try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    cout << "\n\n" << endl;
 
-//     try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
+    style.tabCount = 4;
+    cout << F("style: {:,{},s}\n\n", style, style.value) << endl;
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+
+    try{ cout << F("{:{}}", msi, "0") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:{}}", msi, "1") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
+    try{ cout << F("{:{}}", msi, "x") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
 
 // cout << "** " << __LINE__ << endl;
 //     cout << F("{:,8}", msi) << endl;

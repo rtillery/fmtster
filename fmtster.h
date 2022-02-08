@@ -299,12 +299,17 @@ T FormatToValue(const string& str)
     return FormatToValue<T>(str.c_str());
 }
 template<typename T>
-T FormatToValue(int i)
+T FormatToValue(__int128_t i)
 {
     if (i != 0)
         throw fmt::format_error(F("unsupported format parameter: \"{}\"",
                                   i));
     return i;
+}
+template<typename T>
+T FormatToValue(const fmt::basic_string_view<char>& str)
+{
+    return FormatToValue<T>(str.data);
 }
 
 template<typename T>
@@ -475,23 +480,13 @@ namespace internal
 class JSONStyleHelper
 {
 public:
-    string tab = "  ";  // expanded tab
+    string tab;  // expanded tab
 
     JSONStyle mStyle;
-    VALUE_T mLastStyleValue = 0;
-
-    void updateExpansions()
-    {
-        if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
-        {
-            tab = mStyle.hardTab
-                  ? string(mStyle.tabCount, '\t')
-                  : string(mStyle.tabCount, ' ');
-            mLastStyleValue = mStyle.value;
-        }
-    }
+    VALUE_T mLastStyleValue;
 
     JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
+      : mLastStyleValue(0)
     {
         if (!value)
             value = DEFAULTJSONCONFIG.value;
@@ -513,6 +508,17 @@ public:
         updateExpansions();
         return *this;
     }
+
+    void updateExpansions()
+    {
+        if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
+        {
+            tab = mStyle.hardTab
+                  ? string(mStyle.tabCount, '\t')
+                  : string(mStyle.tabCount, ' ');
+            mLastStyleValue = mStyle.value;
+        }
+    }
 };
 
 } // namespace internal
@@ -520,32 +526,68 @@ public:
 // base class that handles formatting
 struct FmtsterBase
 {
-    static constexpr size_t FORMAT_PARM_INDEX = 0;
-    static constexpr size_t STYLE_PARM_INDEX = 1;
-    static constexpr size_t PER_CALL_PARM_INDEX = 2;
-    static constexpr size_t INDENT_PARM_INDEX = 3;
-
-    static unsigned int sDefaultFormat;
-    static internal::JSONStyleHelper sDefaultStyleHelper;
+protected:
+    static constexpr size_t FORMAT_ARG_INDEX = 0;
+    static constexpr size_t STYLE_ARG_INDEX = 1;
+    static constexpr size_t PER_CALL_ARG_INDEX = 2;
+    static constexpr size_t INDENT_ARG_INDEX = 3;
 
     // results of parsing for use in format()
-    vector<string> mArgData = { "" };
-    vector<int> mNestedArgIndex = { 0 };
+    vector<string> mArgData;
+    vector<unsigned int> mNestedArgIndex;
 
-    // from format arg
-    int mFormatSetting = sDefaultFormat;    // format (0 = JSON)
+    // from format arg (int due to code in FormatToValue(const char*))
+    int mFormatSetting;
 
     // from style arg
-    internal::JSONStyleHelper mStyleHelper = sDefaultStyleHelper.mStyle.value;
+    internal::JSONStyleHelper mJSONStyleHelper;
 
     // from indent
-    size_t mIndentSetting = 0;
+    size_t mIndentSetting;
 
     // from per call parms
-    bool mDisableBras = false;
+    bool mDisableBras;
 
-    string mBraIndent = "";     // expanded brace/bracket indent
-    string mDataIndent = "  ";  // expanded data indent
+    string mBraIndent;  // expanded brace/bracket indent
+    string mDataIndent; // expanded data indent
+
+    //
+    // header-defined static variables to hold user-define defaults
+    //
+    static int& DefaultFormat()
+    {
+        static int defaultFormat = 0;
+        return defaultFormat;
+    };
+
+    static internal::JSONStyleHelper& DefaultJSONStyleHelper()
+    {
+        static internal::JSONStyleHelper defaultStyleHelper(0);
+        return defaultStyleHelper;
+    };
+
+public:
+    //
+    // user access to user-defined defaults
+    //
+    static int GetDefaultFormat()
+    {
+        return DefaultFormat();
+    }
+
+    static const JSONStyle& GetDefaultJSONStyle()
+    {
+        return DefaultJSONStyleHelper().mStyle;
+    }
+
+    FmtsterBase()
+      : mArgData{ "" },
+        mNestedArgIndex{ 0 },
+        mFormatSetting(GetDefaultFormat()),
+        mJSONStyleHelper(GetDefaultJSONStyle().value),
+        mIndentSetting(0),
+        mDisableBras(false)
+    {}
 
     // Parses the format in the format {<format>,<style>,<tab>,<indent>}.
     // > format (default is 0: JSON):
@@ -559,8 +601,6 @@ struct FmtsterBase
     //     negative integers: hard tabs
     // > indent (default is 0):
     //     positive integers: number of <tab>s to start the indent
-
-
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
@@ -620,9 +660,9 @@ struct FmtsterBase
         //
         // format
         //
-        if (mNestedArgIndex[FORMAT_PARM_INDEX])
+        if (mNestedArgIndex[FORMAT_ARG_INDEX])
         {
-            auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_PARM_INDEX]);
+            auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_ARG_INDEX]);
             auto formatSetting = visit_format_arg(
                 [](auto value) -> int
                 {
@@ -635,6 +675,10 @@ struct FmtsterBase
                     {
                         return value;
                     }
+                    else if constexpr (internal::is_string_v<simplify_type<decltype(value)> >)
+                    {
+                        return FormatToValue<decltype(mFormatSetting)>(value);
+                    }
                     else
                     {
                         throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
@@ -643,11 +687,15 @@ struct FmtsterBase
                 formatArg
             );
 
-            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(formatSetting);
+            mFormatSetting = formatSetting;
         }
-        else if(!mArgData[FORMAT_PARM_INDEX].empty())
+        else if(!mArgData[FORMAT_ARG_INDEX].empty())
         {
-            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(mArgData[FORMAT_PARM_INDEX]);
+            mFormatSetting = FormatToValue<decltype(mFormatSetting)>(mArgData[FORMAT_ARG_INDEX]);
+        }
+        else
+        {
+            mFormatSetting = GetDefaultFormat();
         }
 
 
@@ -655,9 +703,9 @@ struct FmtsterBase
         //
         // style
         //
-        if (mNestedArgIndex[STYLE_PARM_INDEX])
+        if (mNestedArgIndex[STYLE_ARG_INDEX])
         {
-            auto styleArg = ctx.arg(mNestedArgIndex[STYLE_PARM_INDEX]);
+            auto styleArg = ctx.arg(mNestedArgIndex[STYLE_ARG_INDEX]);
             auto styleSetting = visit_format_arg(
                 [](auto value) -> uint64_t
                 {
@@ -677,13 +725,17 @@ struct FmtsterBase
                 },
                 styleArg
             );
-            mStyleHelper = internal::JSONStyleHelper(styleSetting);
+            mJSONStyleHelper = internal::JSONStyleHelper(styleSetting);
         }
-        else if(!mArgData[STYLE_PARM_INDEX].empty())
+        else if(!mArgData[STYLE_ARG_INDEX].empty())
         {
             auto styleSetting =
-                ToValue<uint64_t>(mArgData[STYLE_PARM_INDEX]);
-            mStyleHelper = internal::JSONStyleHelper(styleSetting);
+                ToValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
+            mJSONStyleHelper = internal::JSONStyleHelper(styleSetting);
+        }
+        else
+        {
+            mJSONStyleHelper = GetDefaultJSONStyle().value;
         }
 
 
@@ -693,9 +745,9 @@ struct FmtsterBase
         // perm call parms
         //
         string pcpSetting;
-        if (mNestedArgIndex[PER_CALL_PARM_INDEX])
+        if (mNestedArgIndex[PER_CALL_ARG_INDEX])
         {
-            auto pcpArg = ctx.arg(mNestedArgIndex[PER_CALL_PARM_INDEX]);
+            auto pcpArg = ctx.arg(mNestedArgIndex[PER_CALL_ARG_INDEX]);
             pcpSetting = visit_format_arg(
                 [](auto value) -> string
                 {
@@ -711,9 +763,9 @@ struct FmtsterBase
                 },
                 pcpArg);
         }
-        else if (!mArgData[PER_CALL_PARM_INDEX].empty())
+        else if (!mArgData[PER_CALL_ARG_INDEX].empty())
         {
-            pcpSetting = mArgData[PER_CALL_PARM_INDEX];
+            pcpSetting = mArgData[PER_CALL_ARG_INDEX];
         }
 
 
@@ -721,9 +773,9 @@ struct FmtsterBase
         //
         // indent
         //
-        if (mNestedArgIndex[INDENT_PARM_INDEX])
+        if (mNestedArgIndex[INDENT_ARG_INDEX])
         {
-            auto indentArg = ctx.arg(mNestedArgIndex[INDENT_PARM_INDEX]);
+            auto indentArg = ctx.arg(mNestedArgIndex[INDENT_ARG_INDEX]);
             auto indentSetting = visit_format_arg(
                 [](auto value) -> int
                 {
@@ -740,63 +792,57 @@ struct FmtsterBase
 
             mIndentSetting = indentSetting;
         }
-        else if (!mArgData[INDENT_PARM_INDEX].empty())
+        else if (!mArgData[INDENT_ARG_INDEX].empty())
         {
-            mIndentSetting = ToValue<decltype(mIndentSetting)>(mArgData[INDENT_PARM_INDEX]);
+            mIndentSetting = ToValue<decltype(mIndentSetting)>(mArgData[INDENT_ARG_INDEX]);
+        }
+        else
+        {
+            mIndentSetting = 0;
         }
 
-        if (mIndentSetting < 0)
-            throw fmt::format_error(fmt::format("invalid indent: \"{}\"",
-                                                mIndentSetting));
 
 
 
-
-        mStyleHelper.updateExpansions();
+        mJSONStyleHelper.updateExpansions();
 
         // expand indenting
         mBraIndent.clear();
         for (auto i = mIndentSetting; i; --i)
-            mBraIndent += mStyleHelper.tab;
-        mDataIndent = mBraIndent + mStyleHelper.tab;
+            mBraIndent += mJSONStyleHelper.tab;
+        mDataIndent = mBraIndent + mJSONStyleHelper.tab;
 
 
 
 
         // parse those parms
-        if (!pcpSetting.empty())
+        bool negate = false;
+        for (const auto c : pcpSetting)
         {
-            bool negate = false;
-            for (const auto c : pcpSetting)
+            switch (c)
             {
-                switch (c)
-                {
-                case 'b':
-                    mDisableBras = negate;
-                    break;
+            case 'b':
+                mDisableBras = negate;
+                break;
 
-                case 'f':
-                    if (!negate)
-                        sDefaultFormat = mFormatSetting;
-                    break;
+            case 'f':
+                if (!negate)
+                    DefaultFormat() = mFormatSetting;
+                break;
 
-                case 's':
-                    if (!negate)
-                        sDefaultStyleHelper = mStyleHelper;
-                    break;
+            case 's':
+                if (!negate)
+                    DefaultJSONStyleHelper() = mJSONStyleHelper;
+                break;
 
-                default:
-                    ;
-                }
-
-                negate = (c == '-');
+            default:
+                ;
             }
+
+            negate = (c == '-');
         }
     } // resolveArgs()
 }; // struct FmtterBase
-
-extern unsigned int FmtsterBase::sDefaultFormat;
-extern internal::JSONStyleHelper FmtsterBase::sDefaultStyleHelper;
 
 } // namespace fmtster
 
@@ -856,7 +902,7 @@ struct fmt::formatter<T,
                                       fmtStr,
                                       EscapeIfJSONString(val),
                                       mFormatSetting,
-                                      mStyleHelper.mStyle.value,
+                                      mJSONStyleHelper.mStyle.value,
                                       pcp,
                                       mIndentSetting);
             }
@@ -914,7 +960,7 @@ struct fmt::formatter<T,
                             fmtStr,
                             vals,
                             mFormatSetting,
-                            mStyleHelper.mStyle.value,
+                            mJSONStyleHelper.mStyle.value,
                             "",
                             mIndentSetting);
         }
@@ -1038,7 +1084,7 @@ struct fmt::formatter<std::pair<T1, T2> >
                             "{:{},{},{},{}}",
                             p.second,
                             mFormatSetting,
-                            mStyleHelper.mStyle.value,
+                            mJSONStyleHelper.mStyle.value,
                             "",
                             mIndentSetting);
         }
@@ -1111,12 +1157,12 @@ struct fmt::formatter<std::tuple<Ts...> >
                         fmtStr += (--count) ? "{:{},{},{},{}}," : "{:{},{},{},{}}";
                         auto pcp = is_pair_v<simplify_type<decltype(elem)> > ? "-b" : "";
                         itFC = format_to(itFC,
-                                        fmtStr,
-                                        elem,
-                                        mFormatSetting,
-                                        (mStyleHelper.mStyle.value == sDefaultStyleHelper.mStyle.value) ? 0 : mStyleHelper.mStyle.value,
-                                        pcp,
-                                        mIndentSetting);
+                                         fmtStr,
+                                         elem,
+                                         mFormatSetting,
+                                         mJSONStyleHelper.mStyle.value,
+                                         pcp,
+                                         mIndentSetting);
                     }
                     else
                     {
@@ -1185,7 +1231,7 @@ struct fmt::formatter<fmtster::JSONStyle>
                             "{:{},{},{},{}}",
                             tup,
                             mFormatSetting,
-                            mStyleHelper.mStyle.value,
+                            mJSONStyleHelper.mStyle.value,
                             pcp,
                             mIndentSetting);
 
