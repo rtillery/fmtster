@@ -563,6 +563,7 @@ std::string ReplaceString(std::string subject,
 
 TEST_F(FmtsterTest, JSONStyle)
 {
+    // initial default style
     string REF =
         "{\n"
         "  \"cr\" : false,\n"
@@ -585,22 +586,38 @@ TEST_F(FmtsterTest, JSONStyle)
         "  \"svo\" : 1\n"
         "}";
     fmtster::JSONStyle style;
-    auto str = F("{}", style);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\nbase default JSONStyle: {}", REF, str);
+    string str;
+//     str = F("{}", style);
+//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ninitial default JSONStyle: {}", REF, str);
 
-    str = F("{}", fmtster::FmtsterBase::sDefaultStyleHelper.mStyle);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+    // current default should match initial default
+//     str = F("{}", fmtster::FmtsterBase::sDefaultStyleHelper.mStyle);
+//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
 
+    // change style object & reference to use single hard tabs & compare (print with default)
     style.hardTab = true;
     style.tabCount = 1;
     REF = ReplaceString(REF, "\"hardTab\" : false", "\"hardTab\" : true");
     REF = ReplaceString(REF, "\"tabCount\" : 2", "\"tabCount\" : 1");
-    str = F("{}", style);
+//     str = F("{}", style);
+//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+
+    // change reference string to use hard tabs
+    REF = ReplaceString(REF, "  ", "\t");
+//     str = F("{:,{}}", style, style.value);
+//     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+
+    // make style object new default
+    F("{:,{},s}", make_tuple(), style.value);
+    ASSERT_EQ(style.value, fmtster::FmtsterBase::sDefaultStyleHelper.mStyle.value);
+
+    // print current default (with current default style) & compare to reference
+    str = F("{}", fmtster::FmtsterBase::sDefaultStyleHelper.mStyle);
     ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
 
-    REF = ReplaceString(REF, "  ", "\t");
-    str = F("{:,{}}", style, style.value);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+    // return current default to initial default for following tests
+    str = F("{:,{},s}", make_tuple(), 0);
+    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::FmtsterBase::sDefaultStyleHelper.mStyle.value) << F("current default JSONStyle: {},\ninitial default str: {}", REF, str);
 }
 
 // value container tests

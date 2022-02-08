@@ -751,6 +751,18 @@ struct FmtsterBase
 
 
 
+
+        mStyleHelper.updateExpansions();
+
+        // expand indenting
+        mBraIndent.clear();
+        for (auto i = mIndentSetting; i; --i)
+            mBraIndent += mStyleHelper.tab;
+        mDataIndent = mBraIndent + mStyleHelper.tab;
+
+
+
+
         // parse those parms
         if (!pcpSetting.empty())
         {
@@ -780,14 +792,6 @@ struct FmtsterBase
                 negate = (c == '-');
             }
         }
-
-        mStyleHelper.updateExpansions();
-
-        // expand indenting
-        mBraIndent.clear();
-        for (auto i = mIndentSetting; i; --i)
-            mBraIndent += mStyleHelper.tab;
-        mDataIndent = mBraIndent + mStyleHelper.tab;
     } // resolveArgs()
 }; // struct FmtterBase
 
@@ -1124,8 +1128,8 @@ struct fmt::formatter<std::tuple<Ts...> >
                             fmtStr += (--count) ? "{}," : "{}";
 
                         itFC = format_to(itFC,
-                                        fmtStr,
-                                        EscapeIfJSONString(elem));
+                                         fmtStr,
+                                         EscapeIfJSONString(elem));
                     }
                 };
             std::apply([&](const auto&... elems){(fn(elems), ...);}, tup);
