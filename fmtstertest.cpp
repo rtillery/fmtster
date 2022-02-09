@@ -452,9 +452,9 @@ enable_if_t<is_adapter_v<C>,
     auto data = DATA; \
     string str = F("{}", data); \
 cout << str << endl; \
-    auto ref = GetReference(data); \
+    auto gRef = GetReference(data); \
 /* cout << ref << endl; */ \
-    EXPECT_EQ(ref, str) << F("ref: {}\nstr: {}", ref, str); \
+    EXPECT_EQ(gRef, str) << F("ref: {}\nstr: {}", gRef, str); \
 }
 
 #define ARRAYCONTAINERTEST(TYPE) \
@@ -561,63 +561,218 @@ std::string ReplaceString(std::string subject,
     return subject;
 }
 
-TEST_F(FmtsterTest, JSONStyle)
+// initial default style
+static string gRef =
+    "{\n"
+    "  \"cr\" : false,\n"
+    "  \"lf\" : true,\n"
+    "  \"hardTab\" : false,\n"
+    "  \"tabCount\" : 2,\n"
+    "  \"gapA\" : 14,\n"
+    "  \"gapB\" : 2,\n"
+    "  \"gapC\" : 2,\n"
+    "  \"gap1\" : 14,\n"
+    "  \"gap2\" : 0,\n"
+    "  \"gap3\" : 2,\n"
+    "  \"gap4\" : 14,\n"
+    "  \"gap5\" : 0,\n"
+    "  \"gap6\" : 2,\n"
+    "  \"gap7\" : 8,\n"
+    "  \"emptyArray\" : 2,\n"
+    "  \"emptyObject\" : 2,\n"
+    "  \"sva\" : 1,\n"
+    "  \"svo\" : 1\n"
+    "}";
+
+TEST_F(FmtsterTest, JSONStyle_StructDefaultDump)
 {
-    // initial default style
-    string REF =
-        "{\n"
-        "  \"cr\" : false,\n"
-        "  \"lf\" : true,\n"
-        "  \"hardTab\" : false,\n"
-        "  \"tabCount\" : 2,\n"
-        "  \"gapA\" : 14,\n"
-        "  \"gapB\" : 2,\n"
-        "  \"gapC\" : 2,\n"
-        "  \"gap1\" : 14,\n"
-        "  \"gap2\" : 0,\n"
-        "  \"gap3\" : 2,\n"
-        "  \"gap4\" : 14,\n"
-        "  \"gap5\" : 0,\n"
-        "  \"gap6\" : 2,\n"
-        "  \"gap7\" : 8,\n"
-        "  \"emptyArray\" : 2,\n"
-        "  \"emptyObject\" : 2,\n"
-        "  \"sva\" : 1,\n"
-        "  \"svo\" : 1\n"
-        "}";
     fmtster::JSONStyle style;
     string str;
     str = F("{}", style);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ninitial default JSONStyle: {}", REF, str);
+    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ninitial default JSONStyle: {}", gRef, str);
+}
 
+TEST_F(FmtsterTest, JSONStyle_InitialDefaultDump)
+{
     // current default should match initial default
-    str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+    auto str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
+    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+}
 
-    // change style object & reference to use single hard tabs & compare (print with default)
+TEST_F(FmtsterTest, JSONStyle_HardTabDump)
+{
+    // change style object to use single hard tabs
+    fmtster::JSONStyle style;
     style.hardTab = true;
     style.tabCount = 1;
-    REF = ReplaceString(REF, "\"hardTab\" : false", "\"hardTab\" : true");
-    REF = ReplaceString(REF, "\"tabCount\" : 2", "\"tabCount\" : 1");
-    str = F("{}", style);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+    // change reference string to change values (style still default)
+    gRef = ReplaceString(gRef, "\"hardTab\" : false", "\"hardTab\" : true");
+    gRef = ReplaceString(gRef, "\"tabCount\" : 2", "\"tabCount\" : 1");
+    auto str = F("{}", style);
+    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+}
 
-    // change reference string to use hard tabs
-    REF = ReplaceString(REF, "  ", "\t");
-    str = F("{:,{}}", style, style.value);
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+TEST_F(FmtsterTest, JSONStyle_HardTabDump_HardTabStruct)
+{
+    fmtster::JSONStyle style;
+    style.hardTab = true;
+    style.tabCount = 1;
+    // change reference string to use hard tabs in style
+    gRef = ReplaceString(gRef, "  ", "\t");
+    auto str = F("{:,{}}", style, style.value);
+    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+}
 
-    // make style object new default
+TEST_F(FmtsterTest, JSONStyle_HardTabDefault)
+{
+    // make style object with hard tab new default
+    fmtster::JSONStyle style;
+    style.hardTab = true;
+    style.tabCount = 1;
     F("{:,{},s}", make_tuple(), style.value);
     ASSERT_EQ(style.value, fmtster::FmtsterBase::GetDefaultJSONStyle().value);
+}
 
-    // print current default (with current default style) & compare to reference
-    str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
-    ASSERT_EQ(REF, str) << F("REF JSONStyle: {},\ncurrent default str: {}", REF, str);
+TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
+{
+    // serialize current default (with current default style) & compare to reference
+    auto str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
+    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+}
 
+TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
+{
     // return current default to initial default for following tests
-    str = F("{:,{},s}", make_tuple(), 0);
-    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::FmtsterBase::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", REF, str);
+    auto str = F("{:,{},s}", make_tuple(), 0);
+    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::FmtsterBase::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
+}
+
+TEST_F(FmtsterTest, JSONStyle_Style_0)
+{
+    vector<int> v = { 1, 2 };
+    auto str = F("{:,0}", v);
+    string ref =
+        "[\n"
+        "  1,\n"
+        "  2\n"
+        "]";
+    ASSERT_EQ(ref, str) << F("ref: {}\nstr: {}", ref, str);
+}
+
+TEST_F(FmtsterTest, JSONStyle_4SpaceTab)
+{
+    fmtster::JSONStyle style;
+    style.tabCount = 4;
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_0)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:0}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_j)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:j}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_J)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:J}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_json)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:json}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_JSON)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:JSON}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_Json)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:Json}", msi) << endl;
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_1)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:1}", msi) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_x)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:x}", msi) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_X)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:X}", msi) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_xml)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:xml}", msi) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_XML)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:XML}", msi) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_Nested_0)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:{}}", msi, 0) << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_Nested_String_0)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:{}}", msi, "0") << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_Nested_j)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:{}}", msi, "j") << endl;
+}
+
+TEST_F(FmtsterTest, JSONStyle_Format_Nested_J)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    cout << F("{:{}}", msi, "J") << endl;
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_1)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:{}}", msi, 1) << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_string_1)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:{}}", msi, "1") << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_string_x)
+{
+    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
+    ASSERT_THROW(cout << F("{:{}}", msi, "x") << endl, fmt::format_error);
 }
 
 // value container tests

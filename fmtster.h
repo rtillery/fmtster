@@ -266,38 +266,8 @@ string EscapeIfJSONString(const string& strIn)
     return strOut;
 } // EscapeIfJSONString()
 
-int FormatToValue(const char* const sz)
-{
-    int format = -1;
-    if (sz)
-    {
-        const auto c0 = *sz;
-        if ((c0 == '0') || (c0 == 'j') || (c0 == 'J'))
-            format = 0;
-        else
-            throw fmt::format_error(F("unsupported format parameter: \"{}\"",
-                                      EscapeIfJSONString(string(sz))));
-    }
-    return format;
-}
-int FormatToValue(const string& str)
-{
-    return FormatToValue(str.c_str());
-}
-int FormatToValue(__int128_t i)
-{
-    if (i != 0)
-        throw fmt::format_error(F("unsupported format parameter: \"{}\"",
-                                  i));
-    return i;
-}
-int FormatToValue(const fmt::basic_string_view<char>& str)
-{
-    return FormatToValue(str.data());
-}
-
 template<typename T>
-T ToValue(const char* sz)
+T ToValue(const char* sz, const string& throwArg = "")
 {
     T val = 0;
 
@@ -308,8 +278,17 @@ T ToValue(const char* sz)
             const char c = *sz;
             if ((c > '9') || (c < '0'))
             {
-                val = 0;
-                break;
+                if (throwArg.empty())
+                {
+                    val = 0;
+                    break;
+                }
+                else
+                {
+                    throw fmt::format_error(F("fmtster: unsupported {} argument: \"{}\"",
+                                              throwArg,
+                                              sz));
+                }
             }
             val = (val * 10) + (c - '0');
         } while (*(++sz));
@@ -321,6 +300,43 @@ template<typename T>
 T ToValue(const string& str)
 {
     return ToValue<T>(str.c_str());
+}
+
+int FormatToValue(__int128_t i)
+{
+    if (i != 0)
+        throw fmt::format_error(F("fmtster: unsupported format argument value: {}", i));
+    return i;
+}
+int FormatToValue(const char* const sz)
+{
+    int format = -1;
+    if (sz)
+    {
+        const auto c0 = *sz;
+        if ((c0 == 'j') || (c0 == 'J'))
+        {
+            format = 0;
+        }
+        else
+        {
+            format = ToValue<int>(sz, "format");
+        }
+    }
+    return FormatToValue(format);
+}
+int FormatToValue(const string& str)
+{
+    return FormatToValue(str.c_str());
+}
+int FormatToValue(const fmt::basic_string_view<char>& str)
+{
+    return FormatToValue(str.data());
+}
+template<typename T>
+int FormatToValue(T i)
+{
+    return FormatToValue((__int128_t)i);
 }
 
 } // namespace internal
@@ -593,7 +609,7 @@ public:
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-        // generic handling of N comma-separated parms, including recursive braces
+        // generic handling of N comma-separated arguments, including recursive braces
 
         int parmIndex = 0;
         int braces = 1;
@@ -663,17 +679,16 @@ public:
                     using val_t = simplify_type<decltype(value)>;
                     if constexpr (std::is_integral_v<val_t>)
                     {
-                        return value;
+                        return FormatToValue(value); // to check for supported formats
                     }
                     else if constexpr (internal::is_string_v<val_t>)
                     {
-                        return FormatToValue(value);
+                        return FormatToValue(value); // to convert formats
                     }
                     else
                     {
-                        throw
-                            fmt::format_error("unsupported nested argument type: "s
-                                              + typeid(value).name());
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for format: {} (only integers and strings accepted)",
+                                                  typeid(value).name()));
                     }
                 },
                 formatArg
@@ -712,7 +727,8 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for style: (only integers accepted--pass XXXStyle.value, not XXXStyle",
+                                                  typeid(value).name()));
                     }
                 },
                 styleArg
@@ -749,7 +765,8 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: (only strings accepted)",
+                                                  typeid(value).name()));
                     }
                 },
                 pcpArg);
@@ -776,7 +793,8 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error("unsupported nested argument type: "s + typeid(value).name());
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: (only integers accepted)",
+                                                  typeid(value).name()));
                     }
                 },
                 indentArg);

@@ -56,7 +56,16 @@ constexpr auto mt(Ts... es)
     return std::make_tuple(es...);
 }
 
-struct Person
+struct Person1
+{
+    string name;
+    ex_time_point_t birthdate;
+    float salary;
+    vector<string> phones;
+    map<string, string> family;
+};
+
+struct Person2
 {
     string name;
     ex_time_point_t birthdate;
@@ -66,16 +75,14 @@ struct Person
 };
 
 
-
 template<>
-struct fmt::formatter<Person> : fmtster::FmtsterBase
+struct fmt::formatter<Person1>
+  : fmtster::FmtsterBase
 {
     template<typename FormatContext>
-    auto format(const Person& p, FormatContext& ctx)
+    auto format(const Person1& p, FormatContext& ctx)
     {
-        // this could use the tuple approach shown for the opt example in
-        //  main(), but this to illustrates use of the fmt::format_to() call
-        //  and care that needs to be taken with JSON commas
+        // direct approach (take special care with commas and carriage returns!)
 
         resolveArgs(ctx);
 
@@ -86,53 +93,53 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
         // output opening brace (if enabled)
         if (!mDisableBras)
         {
-            itFC = format_to(itFC, "{{\n{}", mDataIndent);
+            itFC = format_to(itFC, "{{\n");
             mIndentSetting++;
         }
 
         itFC = format_to(itFC,
-                         "{:{},{},{},{}},",
+                         "{:{},{},{},{}},\n",
                          mp("name"s, p.name),
                          mFormatSetting,
                          mJSONStyleHelper.mStyle.value,
-                         "",
+                         "-b",
                          mIndentSetting);
-
-        // Note that the last entry's format string below does not end a comma
 
         // @@@ TODO: Wrap this section for use with C++20
         stringstream ss;
         auto t = ex_clock_t::to_time_t(p.birthdate);
         auto tm = *std::localtime(&t);
         ss << std::put_time(&tm, "%x");
+
         itFC = format_to(itFC,
-                         "{:{},{},{},{}},",
+                         "{:{},{},{},{}},\n",
                          mp("birthdate"s, ss.str()),
                          mFormatSetting,
                          mJSONStyleHelper.mStyle.value,
-                         "",
+                         "-b",
                          mIndentSetting);
-
         itFC = format_to(itFC,
-                         "{:{},{},{},{}},",
+                         "{:{},{},{},{}},\n",
                          mp("salary"s, p.salary),
                          mFormatSetting,
                          mJSONStyleHelper.mStyle.value,
-                         "",
+                         "-b",
                          mIndentSetting);
         itFC = format_to(itFC,
-                         "{:{},{},{},{}},",
+                         "{:{},{},{},{}},\n",
                          mp("phones"s, p.phones),
                          mFormatSetting,
                          mJSONStyleHelper.mStyle.value,
-                         "",
+                         "-b",
                          mIndentSetting);
+
+        // Note this entry's format string does not end a comma
         itFC = format_to(itFC,
                          "{:{},{},{},{}}",
                          mp("family"s, p.family),
                          mFormatSetting,
                          mJSONStyleHelper.mStyle.value,
-                         "",
+                         "-b",
                          mIndentSetting);
 
         if (!mDisableBras)
@@ -142,15 +149,52 @@ struct fmt::formatter<Person> : fmtster::FmtsterBase
     }
 };
 
-using Personnel = vector<Person>;
-
-Personnel GetPersonnel()
+template<>
+struct fmt::formatter<Person2>
+  : fmtster::FmtsterBase
 {
+    template<typename FormatContext>
+    auto format(const Person2& p, FormatContext& ctx)
+    {
+        // tuple approach
+
+        resolveArgs(ctx);
+
+        // @@@ TODO: Wrap this section for use with C++20
+        stringstream ss;
+        auto t = ex_clock_t::to_time_t(p.birthdate);
+        auto tm = *std::localtime(&t);
+        ss << std::put_time(&tm, "%x");
+
+        auto tup = mt(
+            mp("name"s, p.name),
+            mp("birthdate"s, ss.str()),
+            mp("salary"s, p.salary),
+            mp("phones"s, p.phones),
+            mp("family"s, p.family)
+        );
+        return format_to(ctx.out(),
+                         "{:{},{},{},{}}",
+                         tup,
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         mDisableBras ? "-b" : "",
+                         mIndentSetting);
+    }
+};
+
+using Personnel1 = vector<Person1>;
+using Personnel2 = vector<Person2>;
+
+template<typename T>
+T GetPersonnel()
+{
+    // birthdates
     static std::tm tm1{ 0, 0, 0,
                         1, 1 - 1, 1970 - 1900 };
     static std::tm tm2{ 0, 0, 0,
                         31, 12 - 1, 1980 - 1900 };
-    return Personnel
+    return T
     {
         {
             .name = "John Doe",
@@ -171,25 +215,11 @@ Personnel GetPersonnel()
                         { "brother", "Jake Doe" },
                         { "father", "James Doe" } }
         }
-
     };
 }
 
 int main()
 {
-    vector<int> v = { 1, 2 };
-    cout << F("blanks: {}", v) << endl;
-
-    cout << F("explicit default style as direct number: {:,0}", v) << endl;
-
-fmtster::JSONStyle style;
-style.tabCount = 8;
-    cout << F("8 char tabs: {:,{}}", v, style.value) << endl;
-
-    cout << F("braceless: {:,,-b}", v) << endl;
-
-    cout << F("Indent 2 units: {:,,,2}", v) << endl;
-
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
@@ -216,45 +246,14 @@ style.tabCount = 8;
     string buildAJSON = "{\n";
 
     size_t personNumber = 0;
-    for (auto person : GetPersonnel())
+    for (auto person : GetPersonnel<Personnel1>())
         cout << F("{} : {}\n", personNumber++, person) << endl;
-
 
     cout << "\n\n" << endl;
 
+    personNumber = 0;
+    for (auto person : GetPersonnel<Personnel2>())
+        cout << F("{} : {}\n", personNumber++, person) << endl;
 
-    style.tabCount = 4;
-    cout << F("style: {:,{},s}\n\n", style, style.value) << endl;
-    map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    try{ cout << F("{}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:0}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:j}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:J}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:json}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:JSON}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:1}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:xml}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:XML}", msi) << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-
-    try{ cout << F("{:{}}", msi, "0") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:{}}", msi, "j") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:{}}", msi, "1") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-    try{ cout << F("{:{}}", msi, "x") << endl; } catch(fmt::format_error& ex) { cout << ex.what() << endl; }
-
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,8}", msi) << endl;
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,{}}", msi, 8) << endl;
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,{},1,4}", msi, 8) << endl;
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,{},,4}", msi, 8) << endl;
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,{},,{}}", msi, 8, 4) << endl;
-// cout << "** " << __LINE__ << endl;
-//     cout << F("{:,{},{},{}}", msi, 8, 1, 4) << endl;
-// cout << "** " << __LINE__ << endl;
-// // not ready for prime time
-// //     cout << F("{:{},{},{},{}}", msi, 0, -1, 0, 2) << endl;
-// // cout << "** " << __LINE__ << endl;
+    cout << "\n\n" << endl;
 }
