@@ -595,7 +595,7 @@ TEST_F(FmtsterTest, JSONStyle_StructDefaultDump)
 TEST_F(FmtsterTest, JSONStyle_InitialDefaultDump)
 {
     // current default should match initial default
-    auto str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
+    auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
     ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
 }
 
@@ -630,13 +630,13 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefault)
     style.hardTab = true;
     style.tabCount = 1;
     F("{:,{},s}", make_tuple(), style.value);
-    ASSERT_EQ(style.value, fmtster::FmtsterBase::GetDefaultJSONStyle().value);
+    ASSERT_EQ(style.value, fmtster::Base::GetDefaultJSONStyle().value);
 }
 
 TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
 {
     // serialize current default (with current default style) & compare to reference
-    auto str = F("{}", fmtster::FmtsterBase::GetDefaultJSONStyle());
+    auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
     ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
 }
 
@@ -644,7 +644,7 @@ TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
 {
     // return current default to initial default for following tests
     auto str = F("{:,{},s}", make_tuple(), 0);
-    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::FmtsterBase::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
+    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_Style_0)
@@ -773,6 +773,12 @@ TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_string_x)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
     ASSERT_THROW(cout << F("{:{}}", msi, "x") << endl, fmt::format_error);
+}
+
+TEST_F(FmtsterTest, Fail_JSONStyle_Style_JSONStyleObject)
+{
+    fmtster::JSONStyle style;
+    ASSERT_THROW(cout << F("{:,{}}", make_tuple(), style) << endl, fmt::format_error);
 }
 
 // value container tests

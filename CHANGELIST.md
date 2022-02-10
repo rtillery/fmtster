@@ -1,27 +1,17 @@
 # **`fmtster` Change List**
-## **0.4.0**
-* Extended support for multiple specifications of format (first argument: 0,
-  j..., J... (where ... is zero or more chars)); default format is JSON
-* Altered JSON style setting to take numeric `value` from the newly added
-  `JSONStyle` union (configure with the anonymous structure members, pass the
-  `value` to **fmtster**; default JSON style is specified by the
-  `fmtster::DEFAULTJSONSTYLE` constant structure
-* Moved the tab specifier into `JSONStyle`
+## **0.5.0**
+* Implemented support for multiple ways of specializing format (first argument:
+  0, j..., J... (where ... is zero or more chars)); initial default format is
+  JSON
+* Implemented support for `fmtster::JSONStyle` object (second argument);
+  **NOTE** that this structure must be passed by using the `value` member;
+  default style is specified by default values in `fmtster::JSONStyle`
+* Moved the tab specifier into `fmtster::JSONStyle`
 * Repurposed third argument to allow specific per-call options using characters
-  to enable each option:
-  * `-` - negate (disable) the option which follows
-  * `f` - make the format specified in the first argument (JSON, etc.) the new
-     default format (default is disabled; since only the JSON format is
-     supported as of this release this option does very little at present
-  * `s` - make the style specified in the second argument the new default for
-    the associated format (default is disabled)
-  * `b` - add braces/brackets to the container output (default is enabled; the
-    setting only applies to the outermost container--containers within the
-    outer container will utilize braces/brackets; this is useful for manual
-    construction of JSON output, especially when a user wants to combine
-    multiple container contents in the same JSON object)
-  * `!` - dump the contents of the `JSONStyle` object (as JSON) instead of the
-    contents of the container (default is disabled)
+  to enable each option.
+## **0.4.0**
+### **NOTE:** 0.4.x was skipped to emphasize how large the change between 0.3.0 and 0.5.0 was :-)
+
 ## **0.3.0**
 * Fixed issues with `std::pair<>`
 * Added support for `std::tuple<>` (currently only meant to hold `std::pair<>`s

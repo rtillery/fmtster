@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#define FMTSTER_VERSION 000400 // 0.4.0
+#define FMTSTER_VERSION 000500 // 0.5.0
 
 #include <algorithm>
 #include <cstdint>
@@ -61,7 +61,7 @@ string F(std::string_view fmt, const Args&... args)
     return fmt::format(fmt, args...);
 }
 
-struct FmtsterBase; // forward declaration
+struct Base; // forward declaration
 
 namespace internal
 {
@@ -214,7 +214,7 @@ inline constexpr bool is_tuple_v = is_tuple<Ts...>::value;
 
 // tools for use below
 fmtster_MAKEIS(fmtsterable,
-               (std::is_base_of_v<fmtster::FmtsterBase, fmt::formatter<simplify_type<T> > >));
+               (std::is_base_of_v<fmtster::Base, fmt::formatter<simplify_type<T> > >));
 fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
                                          is_multimappish<T>,
                                          is_pair<T>,
@@ -341,32 +341,34 @@ int FormatToValue(T i)
 
 } // namespace internal
 
+//
+// enumeration for use in JSONStyle below
+//
 enum JSS
 {
-    BLANK               = 0x0,  // gap
-    STYLE = BLANK,              // empty arrays/objs,
-                                // single value arrays/objs
-    reserved_1          = 0x1,  // gap
-    NOSPACE = reserved_1,       // empty arrays/objs
-    SAMELINE = reserved_1,      // single value arrays/objs
-    SPACE               = 0x2,  // gap
-    // SPACE = SPACE            // empty arrays/objs
-    SPACEx2             = 0x3,  // gap
-    reserved_4          = 0x4,  // gap
-    reserved_5          = 0x5,  // gap
-    TAB                 = 0x6,  // gap
-    TABx2               = 0x7,  // gap
-    NEWLINE             = 0x8,  // gap
-    reserved_9          = 0x9,  // gap
-    NEWLINE_SPACE       = 0xA,  // gap
-    NEWLINE_SPACEx2     = 0xB,  // gap
-    reserved_C          = 0xC,  // gap
-    reserved_D          = 0xD,  // gap
-    NEWLINE_TAB         = 0xE,  // gap
-    NEWLINE_TABx2       = 0xF   // gap
+    BLANK               = 0x0,
+    reserved_1          = 0x1,
+    SPACE               = 0x2,
+    SPACEx2             = 0x3,
+    reserved_4          = 0x4,
+    reserved_5          = 0x5,
+    TAB                 = 0x6,
+    TABx2               = 0x7,
+    NEWLINE             = 0x8,
+    reserved_9          = 0x9,
+    NEWLINE_SPACE       = 0xA,
+    NEWLINE_SPACEx2     = 0xB,
+    reserved_C          = 0xC,
+    reserved_D          = 0xD,
+    NEWLINE_TAB         = 0xE,
+    NEWLINE_TABx2       = 0xF
 }; // enum JSS
 
+//
 // definition of style, reused multiple times below
+//
+#if false // @@@ disable members that are not implemented
+
 #define JSONSTYLESTRUCT                                                        \
     {                                                                          \
         bool cr : 1;                                                           \
@@ -394,6 +396,17 @@ enum JSS
         unsigned int sva : 2;                                                  \
         unsigned int svo : 2;                                                  \
     }
+
+#else
+
+// @@@ all that is implemented currently
+#define JSONSTYLESTRUCT                                                        \
+    {                                                                          \
+        bool hardTab : 1;                                                      \
+        unsigned int tabCount : 4;                                             \
+    }
+
+#endif // true
 
 namespace internal
 {
@@ -427,6 +440,8 @@ union ForwardJSONStyle
 constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
 {
     {
+#if false // @@@ disable members that are not implemented
+
 #ifdef _WIN32
         .cr = true,
         .lf = true,
@@ -438,8 +453,12 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
         .lf = true,
 #endif
 
+#endif // false
+
         .hardTab = false,
         .tabCount = 2,
+
+#if false // @@@ disable members that are not implemented
 
         .gapA = JSS::NEWLINE_TAB,
         .gapB = JSS::SPACE,
@@ -457,6 +476,9 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
         .emptyObject = JSS::SPACE,
         .sva = JSS::SAMELINE,
         .svo = JSS::SAMELINE
+
+#endif // false
+
     }
 };
 
@@ -529,7 +551,7 @@ public:
 } // namespace internal
 
 // base class that handles formatting
-struct FmtsterBase
+struct Base
 {
 protected:
     static constexpr size_t FORMAT_ARG_INDEX = 0;
@@ -585,7 +607,7 @@ public:
         return DefaultJSONStyleHelper().mStyle;
     }
 
-    FmtsterBase()
+    Base()
       : mArgData{ "" },
         mNestedArgIndex{ 0 },
         mFormatSetting(GetDefaultFormat()),
@@ -646,7 +668,7 @@ public:
 
 
 
-    // This function must be called by each FmtsterBase child immediately on
+    // This function must be called by each Base child immediately on
     //  entry to the format() function. It completes the updating of the style
     //  object based on arguments provided, if necessary.
     template<typename FormatContext>
@@ -727,7 +749,7 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for style: (only integers accepted--pass XXXStyle.value, not XXXStyle",
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for style: {} (only integers accepted--pass XXXStyle.value, not XXXStyle)",
                                                   typeid(value).name()));
                     }
                 },
@@ -861,7 +883,7 @@ template<typename T, typename Char>
 struct fmt::formatter<T,
                       Char,
                       std::enable_if_t<fmtster::internal::is_container_v<T> > >
-  : fmtster::FmtsterBase
+  : fmtster::Base
 {
     template<typename FormatContext>
     using FCIt_t = decltype(std::declval<FormatContext>().out());
@@ -1057,7 +1079,7 @@ struct fmt::formatter<A,
 // fmt::formatter<> for std::pair<>
 template<typename T1, typename T2>
 struct fmt::formatter<std::pair<T1, T2> >
-  : fmtster::FmtsterBase
+  : fmtster::Base
 {
     template<typename FormatContext>
     auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
@@ -1122,7 +1144,7 @@ struct fmt::formatter<std::pair<T1, T2> >
 // known at compile time)
 template<typename... Ts>
 struct fmt::formatter<std::tuple<Ts...> >
-  : fmtster::FmtsterBase
+  : fmtster::Base
 {
     template<typename FormatContext>
     auto format(const std::tuple<Ts...>& tup, FormatContext& ctx)
@@ -1204,7 +1226,7 @@ struct fmt::formatter<std::tuple<Ts...> >
 // fmt::formatter<> for fmtster::JSONStyle
 template<>
 struct fmt::formatter<fmtster::JSONStyle>
-    : fmtster::FmtsterBase
+    : fmtster::Base
 {
     template<typename FormatContext>
     auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
@@ -1217,10 +1239,14 @@ struct fmt::formatter<fmtster::JSONStyle>
         auto itFC = ctx.out();
 
         const auto tup = std::make_tuple(
+#if false // @@@ disable members that are not implemented
             make_pair("cr"s, style.cr),
             make_pair("lf"s, style.lf),
+#endif // false
             make_pair("hardTab"s, style.hardTab),
-            make_pair("tabCount"s, style.tabCount),
+            make_pair("tabCount"s, style.tabCount)
+#if false // @@@ disable members that are not implemented
+            ,
             make_pair("gapA"s, style.gapA),
             make_pair("gapB"s, style.gapB),
             make_pair("gapC"s, style.gapC),
@@ -1235,6 +1261,7 @@ struct fmt::formatter<fmtster::JSONStyle>
             make_pair("emptyObject"s, style.emptyObject),
             make_pair("sva"s, style.sva),
             make_pair("svo"s, style.svo)
+#endif // false
         );
         auto pcp = mDisableBras ? "-b" : "";
         itFC = fmt::format_to(itFC,

@@ -34,6 +34,7 @@ using std::stringstream;
 using std::string;
 using namespace std::string_literals;
 #include <tuple>
+using std::tuple;
 #include <utility>
 #include <variant>
 using std::variant;
@@ -74,10 +75,9 @@ struct Person2
     map<string, string> family;
 };
 
-
 template<>
 struct fmt::formatter<Person1>
-  : fmtster::FmtsterBase
+  : fmtster::Base
 {
     template<typename FormatContext>
     auto format(const Person1& p, FormatContext& ctx)
@@ -151,7 +151,7 @@ struct fmt::formatter<Person1>
 
 template<>
 struct fmt::formatter<Person2>
-  : fmtster::FmtsterBase
+  : fmtster::Base
 {
     template<typename FormatContext>
     auto format(const Person2& p, FormatContext& ctx)
@@ -218,6 +218,37 @@ T GetPersonnel()
     };
 }
 
+struct Color
+{
+    string hue; // color family
+    vector<tuple<string, float> > primaries;
+};
+
+template<>
+struct fmt::formatter<Color>
+  : fmtster::Base
+{
+    template<typename FormatContext>
+    auto format(const Color& color, FormatContext& ctx)
+    {
+        using std::make_pair;
+
+        resolveArgs(ctx);
+
+        auto tup = std::make_tuple(
+            make_pair("hue"s, color.hue),
+            make_pair("primaries"s, color.primaries)
+        );
+        return format_to(ctx.out(),
+                         "{:{},{},{},{}}",
+                         tup,
+                         mFormatSetting,
+                         mJSONStyleHelper.mStyle.value,
+                         mDisableBras ? "-b" : "",
+                         mIndentSetting);
+    }
+};
+
 int main()
 {
     // Based on https://json.org/example.html
@@ -243,17 +274,83 @@ int main()
     cout << "\n\n" << endl;
 
 
-    string buildAJSON = "{\n";
-
+    // vector of Person1, where Person1 has a specialized fmt::formatter<>
+    // based on fmtster
     size_t personNumber = 0;
     for (auto person : GetPersonnel<Personnel1>())
         cout << F("{} : {}\n", personNumber++, person) << endl;
 
     cout << "\n\n" << endl;
 
+    // vector of Person2, where Person2 has a specialized fmt::formatter<>
+    // based on fmtster
     personNumber = 0;
     for (auto person : GetPersonnel<Personnel2>())
         cout << F("{} : {}\n", personNumber++, person) << endl;
 
     cout << "\n\n" << endl;
+
+    // map of string to Color, where Color has a specialized fmt::formatter<>
+    // based on fmtster
+    map<string, Color> colors
+    {
+        {
+            "Burgundy",
+            {
+                "red",
+                {
+                    { "red", 1.0 }
+                }
+            }
+        },
+        {
+            "Gray",
+            {
+                "none",
+                {
+                    { "red", 1.0/3.0 },
+                    { "blue", 1.0/3.0 },
+                    { "yellow", 1.0/3.0 }
+                }
+            }
+        }
+    };
+
+    // make 4-space tab the default for JSON
+    fmtster::JSONStyle style;
+    style.tabCount = 4;
+    F("{:j,{},s}", mt(), style.value);
+
+    // print list of customized colors using specialized template above
+    cout << F("Colors: {}", colors) << endl;
+
+    // restore original default style for JSON
+    F("{:j,{},s}", mt(), fmtster::JSONStyle{}.value);
+
+    cout << "\n\n" << endl;
+
+    // example of combining simple container/struct/class container contents
+    // into the same JSON object
+
+    // output opening bracket for re-arranged list of colors
+    cout << "Colors: [\n";
+    size_t count = colors.size();
+    for (auto pr : colors)
+    {
+        // pr is a std::pair<string, vector<tuple<string, float> > >
+
+        // manual use of a brace requires manual addition of the tab
+        cout << "  {\n";
+
+        // "-b" disables braces around the objects
+        // 2 initial indents: 1 for the brace (above) + 1 more for the data inside
+        cout << F("{:,,-b,2},\n", mp("name"s, std::get<0>(pr)));
+        cout << F("{:,,-b,2}\n", std::get<1>(pr));
+
+        // care must be taken to properly handle JSON commas
+        cout << (--count ? "  },\n" : "  }\n");
+    }
+
+    // output closing bracket
+    cout << "]" << endl;
 }
