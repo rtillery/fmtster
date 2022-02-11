@@ -166,9 +166,9 @@ of opening and closing braces and brackets, the spacing between punctuation and
 values, as well as exceptional choices like grouping short or empty arrays on
 one line or placing single entry JSON objects on a single line, etc.<br>
 <br>
-`fmtster::JSONStyle` is the structure which provides these options. *(Currently,
-only the kind of tab (hard or space) and number of tab characters is
-configurable.)*
+`fmtster::JSONStyle` is the structure which provides these options for JSON.
+*(Currently, only the kind of tab (hard or space) and number of tab characters
+are configurable.)*
 <br>
 
 ---
@@ -234,7 +234,7 @@ provided via additional arguments. For example:
     cout << F("{:,,{}}", container, "-b") << endl;
 
 ### **Initial Indent**
-    // indent accepts a integer
+    // indent accepts an integer
     cout << F("{:,,,{}}", container, indent) << endl;
 
 ---
@@ -243,8 +243,8 @@ provided via additional arguments. For example:
 ## **Aliases**
 <br>
 
-`fmtster` provides the following aliases (with example code showing how to
-utilize them):
+`fmtster` provides the following aliases (example code below showing how
+to utilize them):
 
 <br>
 
@@ -264,13 +264,15 @@ explicitly shown).*
 ---
 <br>
 
-## **Managing The Default Format And Style**
+## **Managing The Default Serialization Format And Style**
 <br>
+
+### **Default Serialization Format**
 
 `fmtster` initializes with a built-in default serialization format (JSON).
 
 To change the default serialization format, use the per-call-parameter argument
-(`f`) on any serialization using the desired default serialization format:
+(`f`) in any serialization call using the desired default serialization format:
 
     // set the default serialization format to JSON
     cout << F("{:json,,f}", container) << endl;
@@ -280,6 +282,7 @@ To change the default serialization format, use the per-call-parameter argument
 
     // print the index of the current default serialization format (for debugging)
     cout << F("{}", fmtster::Base::GetDefaultFormat()) << endl;
+### **Default Format Style**
 
 `fmtster` initializes with a built-in style format for each serialization
 format.
@@ -310,8 +313,8 @@ serialization format and desired default style for that format:
 <br>
 
 `fmtster`'s powerful formatting control can be extended to serialize custom
-structures/classes, including those that include containers (or other
-specialized structure/classes) within. For example:
+structures/classes, including those that themselves include containers or other
+specialized structure/classes. For example:
 
     // custom structure
     struct Color
@@ -331,19 +334,20 @@ specialized structure/classes) within. For example:
             using std::make_pair;
 
             // this function must be called to allow fmtster to resolve the
-            // arguments which may be passed in nested braces (i.e. as a value
-            // argument to the fmt::format() call instead of as a literal in
-            // the format string itself)
+            // arguments which may be passed directly or in nested braces (i.e. as
+            // a value argument to the fmt::format() call instead of as a literal
+            // int the format string itself)
             resolveArgs(ctx);
 
             // the easiest way to provide custom support is to use fmtster's
-            // support of std::tuple<>, filling it with std::pair<>s which
-            // each contain a string holding the member name and the actual
-            // member value
+            // support of std::tuple<>, filling it with std::pair<>s, each
+            // containing a string with the member name and the actual member
+            // value
             auto tup = std::make_tuple(
                 make_pair("hue"s, color.hue),
                 make_pair("primaries"s, color.primaries)
             );
+
             // forwarding all the resolved arguments ensures that fmtster can
             // format the serial output as specified in the fmt::format() call
             return format_to(ctx.out(),
