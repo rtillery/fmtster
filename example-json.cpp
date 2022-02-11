@@ -101,7 +101,7 @@ struct fmt::formatter<Person1>
                          "{:{},{},{},{}},\n",
                          mp("name"s, p.name),
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          "-b",
                          mIndentSetting);
 
@@ -115,21 +115,21 @@ struct fmt::formatter<Person1>
                          "{:{},{},{},{}},\n",
                          mp("birthdate"s, ss.str()),
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          "-b",
                          mIndentSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("salary"s, p.salary),
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          "-b",
                          mIndentSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("phones"s, p.phones),
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          "-b",
                          mIndentSetting);
 
@@ -138,7 +138,7 @@ struct fmt::formatter<Person1>
                          "{:{},{},{},{}}",
                          mp("family"s, p.family),
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          "-b",
                          mIndentSetting);
 
@@ -177,7 +177,7 @@ struct fmt::formatter<Person2>
                          "{:{},{},{},{}}",
                          tup,
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          mDisableBras ? "-b" : "",
                          mIndentSetting);
     }
@@ -243,7 +243,7 @@ struct fmt::formatter<Color>
                          "{:{},{},{},{}}",
                          tup,
                          mFormatSetting,
-                         mJSONStyleHelper.mStyle.value,
+                         mStyleValue,
                          mDisableBras ? "-b" : "",
                          mIndentSetting);
     }

@@ -220,125 +220,6 @@ fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
                                          is_pair<T>,
                                          is_tuple<T> >));
 
-//
-// misc helpers
-//
-// Dummy escape function for all but strings
-template<typename T>
-T EscapeIfJSONString(const T& val)
-{
-    return val;
-}
-// escape string the JSON way
-template<>
-string EscapeIfJSONString(const string& strIn)
-{
-    string strOut;
-    strOut.reserve(strIn.length() * 6);
-    for (const char c : strIn)
-    {
-        if ((c <= '\x1F') || (c >= '\x7F'))
-        {
-            switch (c)
-            {
-            case '\b': strOut += R"(\b)"; break;
-            case '\f': strOut += R"(\f)"; break;
-            case '\n': strOut += R"(\n)"; break;
-            case '\r': strOut += R"(\r)"; break;
-            case '\t': strOut += R"(\t)"; break;
-            default:
-                strOut += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
-            }
-        }
-        else
-        {
-            switch (c)
-            {
-            case '\\':   strOut += R"(\\)"; break;
-            case '\"':   strOut += R"(\")"; break;
-            case '/':    strOut += R"(\/)"; break;
-            case '\x7F': strOut += R"(\u007F)"; break;
-            default:     strOut += c;
-            }
-        }
-    }
-
-    return strOut;
-} // EscapeIfJSONString()
-
-template<typename T>
-T ToValue(const char* sz, const string& throwArg = "")
-{
-    T val = 0;
-
-    if (sz)
-    {
-        do
-        {
-            const char c = *sz;
-            if ((c > '9') || (c < '0'))
-            {
-                if (throwArg.empty())
-                {
-                    val = 0;
-                    break;
-                }
-                else
-                {
-                    throw fmt::format_error(F("fmtster: unsupported {} argument: \"{}\"",
-                                              throwArg,
-                                              sz));
-                }
-            }
-            val = (val * 10) + (c - '0');
-        } while (*(++sz));
-    }
-
-    return val;
-}
-template<typename T>
-T ToValue(const string& str)
-{
-    return ToValue<T>(str.c_str());
-}
-
-int FormatToValue(__int128_t i)
-{
-    if (i != 0)
-        throw fmt::format_error(F("fmtster: unsupported format argument value: {}", i));
-    return i;
-}
-int FormatToValue(const char* const sz)
-{
-    int format = -1;
-    if (sz)
-    {
-        const auto c0 = *sz;
-        if ((c0 == 'j') || (c0 == 'J'))
-        {
-            format = 0;
-        }
-        else
-        {
-            format = ToValue<int>(sz, "format");
-        }
-    }
-    return FormatToValue(format);
-}
-int FormatToValue(const string& str)
-{
-    return FormatToValue(str.c_str());
-}
-int FormatToValue(const fmt::basic_string_view<char>& str)
-{
-    return FormatToValue(str.data());
-}
-template<typename T>
-int FormatToValue(T i)
-{
-    return FormatToValue((__int128_t)i);
-}
-
 } // namespace internal
 
 //
@@ -414,10 +295,10 @@ enum JSS
 namespace internal
 {
 
-// used to measure the size of the bitfield-based structure
+// used to measure the size of the bitfield-based structures
 struct MeasureJSONStyle JSONSTYLESTRUCT;
 
-// If well packed, the style structure will fit into 64 bits, but if not, we
+// If well packed, each style structure will fit into 64 bits, but if not, we
 // can use 128 bits.
 template<size_t bytes>
 using VALUE_TYPE =
@@ -506,22 +387,113 @@ public:
 namespace internal
 {
 
-// wrapper of JSONStyle that expands configuration to strings used in output
-class JSONStyleHelper
+// base class used by all serialization format style helpers
+struct StyleHelper
 {
-public:
+    union
+    {
+        VALUE_T value;
+        JSONStyle jsonStyle;    // never actually referenced
+        // XMLStyle xmlStyle;      // never actually references
+    } mStyle;
+
     string tab;  // expanded tab
 
-    JSONStyle mStyle;
+    StyleHelper(VALUE_T val)
+      : mStyle{val}
+    {}
+
+    template<typename T>
+    T toValue(const char* sz, const string& throwArg = "")
+    {
+        T val = 0;
+
+        if (sz)
+        {
+            do
+            {
+                const char c = *sz;
+                if ((c > '9') || (c < '0'))
+                {
+                    if (throwArg.empty())
+                    {
+                        val = 0;
+                        break;
+                    }
+                    else
+                    {
+                        throw fmt::format_error(F("fmtster: unsupported {} argument: \"{}\"",
+                                                throwArg,
+                                                sz));
+                    }
+                }
+                val = (val * 10) + (c - '0');
+            } while (*(++sz));
+        }
+
+        return val;
+    }
+    template<typename T>
+    T toValue(const string& str)
+    {
+        return toValue<T>(str.c_str());
+    }
+
+    int formatToValue(__int128_t i)
+    {
+        if (i != 0)
+            throw fmt::format_error(F("fmtster: unsupported format argument value: {}", i));
+        return i;
+    }
+    template<typename T>
+    int formatToValue(T i)
+    {
+        return formatToValue((__int128_t)i);
+    }
+    int formatToValue(const char* const sz)
+    {
+        int format = -1;
+        if (sz)
+        {
+            const auto c0 = *sz;
+            if ((c0 == 'j') || (c0 == 'J'))
+            {
+                format = 0;
+            }
+            else
+            {
+                format = toValue<int>(sz, "format");
+            }
+        }
+        return formatToValue(format);
+    }
+    int formatToValue(const string& str)
+    {
+        return formatToValue(str.c_str());
+    }
+    int formatToValue(const fmt::basic_string_view<char>& str)
+    {
+        return formatToValue(str.data());
+    }
+
+    virtual void updateExpansions()
+    {
+        throw std::bad_function_call();
+    }
+}; // StyleHelper
+
+// wrapper of JSONStyle that expands configuration to strings used in output
+class JSONStyleHelper
+  : public StyleHelper
+{
+
     VALUE_T mLastStyleValue;
 
+public:
     JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
-      : mLastStyleValue(0)
+      : StyleHelper(value ? value : DEFAULTJSONCONFIG.value),
+        mLastStyleValue(0)
     {
-        if (!value)
-            value = DEFAULTJSONCONFIG.value;
-
-        mStyle.value = value;
         updateExpansions();
     }
 
@@ -539,13 +511,56 @@ public:
         return *this;
     }
 
+    // Dummy escape function for all but strings
+    template<typename T>
+    T escapeIfString(const T& val)
+    {
+        return val;
+    }
+    // escape string the JSON way
+    string escapeIfString(const string& strIn)
+    {
+        string strOut;
+        strOut.reserve(strIn.length() * 6);
+        for (const char c : strIn)
+        {
+            if ((c <= '\x1F') || (c >= '\x7F'))
+            {
+                switch (c)
+                {
+                case '\b': strOut += R"(\b)"; break;
+                case '\f': strOut += R"(\f)"; break;
+                case '\n': strOut += R"(\n)"; break;
+                case '\r': strOut += R"(\r)"; break;
+                case '\t': strOut += R"(\t)"; break;
+                default:
+                    strOut += F(R"(\u{:04X})", (unsigned int)((unsigned char)c));
+                }
+            }
+            else
+            {
+                switch (c)
+                {
+                case '\\':   strOut += R"(\\)"; break;
+                case '\"':   strOut += R"(\")"; break;
+                case '/':    strOut += R"(\/)"; break;
+                case '\x7F': strOut += R"(\u007F)"; break;
+                default:     strOut += c;
+                }
+            }
+        }
+
+        return strOut;
+    } // escapeIfString()
+
     void updateExpansions()
     {
         if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
         {
-            tab = mStyle.hardTab
-                  ? string(mStyle.tabCount, '\t')
-                  : string(mStyle.tabCount, ' ');
+            const JSONStyle style(mStyle.value);
+            tab = style.hardTab
+                  ? string(style.tabCount, '\t')
+                  : string(style.tabCount, ' ');
             mLastStyleValue = mStyle.value;
         }
     }
@@ -566,11 +581,12 @@ protected:
     vector<string> mArgData;
     vector<unsigned int> mNestedArgIndex;
 
-    // from format arg (int due to code in FormatToValue(const char*))
+    // from format arg (int due to code in formatToValue(const char*))
     int mFormatSetting;
 
     // from style arg
-    internal::JSONStyleHelper mJSONStyleHelper;
+    std::unique_ptr<internal::StyleHelper> mpStyleHelper;
+    std::reference_wrapper<internal::VALUE_T> mStyleValue;
 
     // from indent
     size_t mIndentSetting;
@@ -596,6 +612,19 @@ protected:
         return defaultStyleHelper;
     };
 
+    template<typename T>
+    T escapeIfString(int format, const T& val)
+    {
+        switch (format)
+        {
+        case 0:
+            return dynamic_cast<internal::JSONStyleHelper*>(mpStyleHelper.get())->escapeIfString(val);
+
+        default:
+            throw fmt::format_error("fmtster: Shouldn't get here, because unsupported format should have already been thrown");
+        }
+    }
+
 public:
     //
     // user access to user-defined defaults
@@ -607,14 +636,15 @@ public:
 
     static const JSONStyle& GetDefaultJSONStyle()
     {
-        return DefaultJSONStyleHelper().mStyle;
+        return DefaultJSONStyleHelper().mStyle.jsonStyle;
     }
 
     Base()
       : mArgData{ "" },
         mNestedArgIndex{ 0 },
         mFormatSetting(GetDefaultFormat()),
-        mJSONStyleHelper(GetDefaultJSONStyle().value),
+        mpStyleHelper(new internal::JSONStyleHelper(GetDefaultJSONStyle())), // helper for default format
+        mStyleValue(mpStyleHelper->mStyle.value),
         mIndentSetting(0),
         mDisableBras(false)
     {}
@@ -694,7 +724,7 @@ public:
         {
             auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_ARG_INDEX]);
             auto formatSetting = visit_format_arg(
-                [](auto value) -> int
+                [this](auto value) -> int
                 {
                     // This construct is required because at compile time all
                     //  paths are linked, even though that are not allowed at
@@ -704,11 +734,11 @@ public:
                     using val_t = simplify_type<decltype(value)>;
                     if constexpr (std::is_integral_v<val_t>)
                     {
-                        return FormatToValue(value); // to check for supported formats
+                        return mpStyleHelper->formatToValue(value); // to check for supported formats
                     }
                     else if constexpr (internal::is_string_v<val_t>)
                     {
-                        return FormatToValue(value); // to convert formats
+                        return mpStyleHelper->formatToValue(value); // to convert formats
                     }
                     else
                     {
@@ -723,7 +753,7 @@ public:
         }
         else if(!mArgData[FORMAT_ARG_INDEX].empty())
         {
-            mFormatSetting = FormatToValue(mArgData[FORMAT_ARG_INDEX]);
+            mFormatSetting = mpStyleHelper->formatToValue(mArgData[FORMAT_ARG_INDEX]);
         }
         else
         {
@@ -735,11 +765,12 @@ public:
         //
         // style
         //
+        VALUE_T styleSetting = 0;
         if (mNestedArgIndex[STYLE_ARG_INDEX])
         {
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_ARG_INDEX]);
-            auto styleSetting = visit_format_arg(
-                [](auto value) -> uint64_t
+            styleSetting = visit_format_arg(
+                [](auto value) -> VALUE_T
                 {
                     // This construct is required because at compile time all
                     //  type paths are linked, even though that are not allowed
@@ -758,17 +789,25 @@ public:
                 },
                 styleArg
             );
-            mJSONStyleHelper = internal::JSONStyleHelper(styleSetting);
         }
         else if(!mArgData[STYLE_ARG_INDEX].empty())
         {
-            auto styleSetting = ToValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
-            mJSONStyleHelper = internal::JSONStyleHelper(styleSetting);
+            auto styleSetting = mpStyleHelper->toValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
         }
-        else
+
+        switch (mFormatSetting)
         {
-            mJSONStyleHelper = GetDefaultJSONStyle().value;
+        case 0:
+            if (!styleSetting)
+                styleSetting = GetDefaultJSONStyle().value;
+            mpStyleHelper.reset(new internal::JSONStyleHelper(styleSetting));
+            break;
+
+        default:
+            throw fmt::format_error("fmtster (style): Shouldn't get here, because unsupported format should have already been thrown");
         }
+
+        mStyleValue = mpStyleHelper->mStyle.value;
 
 
 
@@ -829,7 +868,7 @@ public:
         else if (!mArgData[INDENT_ARG_INDEX].empty())
         {
             mIndentSetting =
-                ToValue<decltype(mIndentSetting)>(mArgData[INDENT_ARG_INDEX]);
+                mpStyleHelper->toValue<decltype(mIndentSetting)>(mArgData[INDENT_ARG_INDEX]);
         }
         else
         {
@@ -839,13 +878,13 @@ public:
 
 
 
-        mJSONStyleHelper.updateExpansions();
+        mpStyleHelper->updateExpansions();
 
         // expand indenting
         mBraIndent.clear();
         for (auto i = mIndentSetting; i; --i)
-            mBraIndent += mJSONStyleHelper.tab;
-        mDataIndent = mBraIndent + mJSONStyleHelper.tab;
+            mBraIndent += mpStyleHelper->tab;
+        mDataIndent = mBraIndent + mpStyleHelper->tab;
 
 
 
@@ -867,7 +906,17 @@ public:
 
             case 's':
                 if (!negate)
-                    DefaultJSONStyleHelper() = mJSONStyleHelper;
+                {
+                    switch (mFormatSetting)
+                    {
+                    case 0:
+                        DefaultJSONStyleHelper() = *dynamic_cast<JSONStyleHelper*>(mpStyleHelper.get());
+                        break;
+
+                    default:
+                        throw fmt::format_error("fmtster (pcp): Shouldn't get here, because unsupported format should have already been thrown");
+                    }
+                }
                 break;
 
             default:
@@ -891,8 +940,8 @@ struct fmt::formatter<T,
     template<typename FormatContext>
     using FCIt_t = decltype(std::declval<FormatContext>().out());
 
-    // templated function inner loop function for ALL CONTAINERS except
-    // multimaps (this can be used for single data per element & map-like
+    // templated function inner loop function for ALL CONTAINERS EXCEPT
+    // MULTIMAPS (this can be used for single data per element & map-like
     // containers because map-like containers use a std::pair<> for each
     // element)
     template<typename FormatContext, typename C = T>
@@ -921,23 +970,22 @@ struct fmt::formatter<T,
 
             bool isLastElement = (itC == c.end());
 
-            // NOTE: decltype(val) SHOULD be able to be used here, instead of
-            //       typename C::value_type. But for some reason, while the
-            //       verified (printing typeid(val).name() vs typeid(typename
-            //       C::valuetype).name()) types are the same, is_fmtsterable<>
-            //       can't seem to handle the former.
-            if (is_fmtsterable_v<typename C::value_type>)
+            using SimpleValType = simplify_type<decltype(val)>;
+
+            auto escVal = escapeIfString(mFormatSetting, val);
+
+            if (is_fmtsterable_v<SimpleValType>)
             {
-                if (!is_pair_v<simplify_type<decltype(val)> >)
+                if (!is_pair_v<SimpleValType>)
                     fmtStr += indent;
 
                 fmtStr += isLastElement ? "{:{},{},{},{}}" : "{:{},{},{},{}},";
                 auto pcp = is_pair_v<simplify_type<decltype(val)> > ? "-b" : "";
                 itFC = fmt::format_to(itFC,
                                       fmtStr,
-                                      EscapeIfJSONString(val),
+                                      escVal,
                                       mFormatSetting,
-                                      mJSONStyleHelper.mStyle.value,
+                                      mStyleValue,
                                       pcp,
                                       mIndentSetting);
             }
@@ -949,7 +997,9 @@ struct fmt::formatter<T,
                     fmtStr += isLastElement ? "\"{}\"" : "\"{}\",";
                 else
                     fmtStr += isLastElement ? "{}" : "{},";
-                itFC = fmt::format_to(itFC, fmtStr, EscapeIfJSONString(val));
+                itFC = fmt::format_to(itFC,
+                                      fmtStr,
+                                      escVal);
             }
         }
     } // format_loop() (all containers except multimap)
@@ -979,7 +1029,10 @@ struct fmt::formatter<T,
                 fmtStr += "{}\"{}\" : ";
             else
                 fmtStr += "{}{} : ";
-            itFC = fmt::format_to(itFC, fmtStr, indent, EscapeIfJSONString(key));
+            itFC = fmt::format_to(itFC,
+                                  fmtStr,
+                                  indent,
+                                  escapeIfString(mFormatSetting, key));
 
             // insert each value with the same key into a temp vector to
             // print
@@ -995,7 +1048,7 @@ struct fmt::formatter<T,
                             fmtStr,
                             vals,
                             mFormatSetting,
-                            mJSONStyleHelper.mStyle.value,
+                            mStyleValue,
                             "",
                             mIndentSetting);
         }
@@ -1110,7 +1163,7 @@ struct fmt::formatter<std::pair<T1, T2> >
         itFC = format_to(ctx.out(),
                         fmtStr,
                         mDisableBras ? mBraIndent : mDataIndent,
-                        EscapeIfJSONString(p.first));
+                        escapeIfString(mFormatSetting, p.first));
 
         // value
         if (fmtster::internal::is_fmtsterable_v<T2>)
@@ -1119,7 +1172,7 @@ struct fmt::formatter<std::pair<T1, T2> >
                             "{:{},{},{},{}}",
                             p.second,
                             mFormatSetting,
-                            mJSONStyleHelper.mStyle.value,
+                            mStyleValue,
                             "",
                             mIndentSetting);
         }
@@ -1130,7 +1183,7 @@ struct fmt::formatter<std::pair<T1, T2> >
                     : fmtStr = "{}";
             itFC = format_to(itFC,
                             fmtStr,
-                            EscapeIfJSONString(p.second));
+                            escapeIfString(mFormatSetting, p.second));
         }
 
         // output closing bracket/brace (if enabled)
@@ -1195,7 +1248,7 @@ struct fmt::formatter<std::tuple<Ts...> >
                                          fmtStr,
                                          elem,
                                          mFormatSetting,
-                                         mJSONStyleHelper.mStyle.value,
+                                         mStyleValue,
                                          pcp,
                                          mIndentSetting);
                     }
@@ -1210,7 +1263,7 @@ struct fmt::formatter<std::tuple<Ts...> >
 
                         itFC = format_to(itFC,
                                          fmtStr,
-                                         EscapeIfJSONString(elem));
+                                         escapeIfString(mFormatSetting, elem));
                     }
                 };
             std::apply([&](const auto&... elems){(fn(elems), ...);}, tup);
@@ -1271,7 +1324,7 @@ struct fmt::formatter<fmtster::JSONStyle>
                             "{:{},{},{},{}}",
                             tup,
                             mFormatSetting,
-                            mJSONStyleHelper.mStyle.value,
+                            mStyleValue,
                             pcp,
                             mIndentSetting);
 

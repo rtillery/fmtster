@@ -354,7 +354,7 @@ specialized structure/classes. For example:
                              "{:{},{},{},{}}",
                              tup,
                              mFormatSetting,
-                             mJSONStyleHelper.mStyle.value,
+                             mStyleValue,
                              mDisableBras ? "-b" : "",
                              mIndentSetting);
         }

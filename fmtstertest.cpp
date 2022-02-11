@@ -648,7 +648,7 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
 TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
 {
     // return current default to initial default for following tests
-    auto str = F("{:,{},s}", make_tuple(), 0);
+    auto str = F("{:,{},s}", make_tuple(), fmtster::JSONStyle{}.value);
     ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
 }
 

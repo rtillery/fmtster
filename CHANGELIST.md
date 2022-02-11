@@ -4,8 +4,9 @@
   0, j..., J... (where ... is zero or more chars)); initial default format is
   JSON
 * Implemented support for `fmtster::JSONStyle` object (second argument);
-  **NOTE** that this structure must be passed by using the `value` member;
-  default style is specified by default values in `fmtster::JSONStyle`
+  initial (struct) default style is specified by default values in
+  `fmtster::JSONStyle`
+  ### **NOTE: that this structure must be passed by using the `value` member**
 * Moved the tab specifier into `fmtster::JSONStyle`
 * Repurposed third argument to allow specific per-call options using characters
   to enable each option.
