@@ -371,6 +371,9 @@ enum JSS
 
 #define JSONSTYLESTRUCT                                                        \
     {                                                                          \
+        /* note that these two booleans can never both be false, so they */    \
+        /* double as a method of differentiating a default-meaning 0 from */   \
+        /* an actual configuration setting */                                  \
         bool cr : 1;                                                           \
         bool lf : 1;                                                           \
                                                                                \

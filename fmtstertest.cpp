@@ -506,8 +506,7 @@ KEYVALUECONTAINERTEST(CONT, string, bool)
 /* test object */
 
 class FmtsterTest : public ::testing::Test
-{
-};
+{};
 
 
 /*

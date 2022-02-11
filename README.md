@@ -43,13 +43,11 @@ family of commands, and produces a `std::string` serialization of the contents.
     using std::cout;
     using std::endl;
 
-<br>
-
 The simplest example of its use:
 
     map<string, map<string, vector<string> > > mydata = { ... };
     ...
-    cout << fmt::format("mydata:\n{}", mydata) << std::endl;
+    cout << fmt::format("mydata:\n{}", mydata) << endl;
 and its (default) output:
 
     mydata:
@@ -71,7 +69,6 @@ and its (default) output:
         ]
       }
     }
-
 ---
 <br>
 
@@ -211,6 +208,38 @@ serialization, when certain style settings are chosen.<br>
 ---
 <br>
 
+## **Nested Arguments**
+<br>
+
+As with other {fmt} arguments, direct values can be used or values can be
+provided via additional arguments. For example:
+
+### **Serialization Format**
+    // format accepts an integer or (C or C++) string
+    cout << F("{:{}}", container, 0) << endl;
+    cout << F("{:{}}", container, "json") << endl;
+    cout << F("{:{}}", container, "JSON"s) << endl;
+
+### **Format Style***
+    // style accepts a very large integer that is a union with a
+    // bitfield-based structure holding the configuration settings; like an
+    // empty argument, a value of 0 causes the current default style (for the
+    // format specified by the first argument)
+    fmtster::JSONStyle style;
+    style.tabCount = 4;
+    cout << F("{:,{}}", container, style.value) << endl;
+
+### **Per-Call Parameters**
+    // per-call-parameters accept a (C or C++ string)
+    cout << F("{:,,{}}", container, "-b") << endl;
+
+### **Initial Indent**
+    // indent accepts a integer
+    cout << F("{:,,,{}}", container, indent) << endl;
+
+---
+<br>
+
 ## **Aliases**
 <br>
 
@@ -224,7 +253,7 @@ utilize them):
 #include <fmtster>
 using fmtster::F;
 
-std::cout << F("{}", container) << std::endl;
+cout << F("{}", container) << endl;
 ```
 <br>
 
