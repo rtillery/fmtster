@@ -564,10 +564,14 @@ std::string ReplaceString(std::string subject,
 // initial default style
 static string gRef =
     "{\n"
+#if false // @@@ disable members that are not implemented
     "  \"cr\" : false,\n"
     "  \"lf\" : true,\n"
+#endif // false
     "  \"hardTab\" : false,\n"
-    "  \"tabCount\" : 2,\n"
+    "  \"tabCount\" : 2"
+#if false // @@@ disable members that are not implemented
+                      ",\n"
     "  \"gapA\" : 14,\n"
     "  \"gapB\" : 2,\n"
     "  \"gapC\" : 2,\n"
@@ -581,7 +585,9 @@ static string gRef =
     "  \"emptyArray\" : 2,\n"
     "  \"emptyObject\" : 2,\n"
     "  \"sva\" : 1,\n"
-    "  \"svo\" : 1\n"
+    "  \"svo\" : 1"
+#endif // false
+                 "\n"
     "}";
 
 TEST_F(FmtsterTest, JSONStyle_StructDefaultDump)
