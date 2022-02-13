@@ -93,11 +93,10 @@ container serialization.
 There are (currently) four arguments for setting the desired serialization
 output, which are provided (like {fmt}) in the braces associated with a
 specific value, separated by commas
-* Serialization Format
-* Format Style
-* Per-Call Parameters
 * Initial Indent
-> `{`\<index>`:`\<format>`,`\<style>`,`\<per-call-parms>`,`\<indent>`}`
+* Per-Call Parameters
+* Format Style
+> `{`\<index>`:`\<indent>`,`\<per-call-parms>`,`\<style>`,`\<format>`}`
 
 <br>
 
@@ -106,22 +105,22 @@ value is used. Some examples:
 > `fmt::format("{}", container);`<br>
 > The default values are used for all arguments.
 
-> `fmt::format("{:json}", container);`<br>
-> The default values are used for all arguments except the first.
-
-> `fmt::format("{:,{}}", container, style.value);`<br>
-> The default values are used for all arguments except the second, which
-> is provided by the `style` object.
-
-> `fmt::format("{:,,-b}", container);`<br>
-> The default values are used for all arguments except the third.
-
-> `fmt::format("{:,,,1}", container);`<br>
+> `fmt::format("{:,,,json}", container);`<br>
 > The default values are used for all arguments except the fourth.
 
-> `fmt::format("{:,{},,2}, container, style.value);`<br>
-> The default values are used for all arguments except the second and
-> fourth.
+> `fmt::format("{:,,{}}", container, style.value);`<br>
+> The default values are used for all arguments except the third, which
+> is provided by the `style` object.
+
+> `fmt::format("{:,-b}", container);`<br>
+> The default values are used for all arguments except the second.
+
+> `fmt::format("{:1}", container);`<br>
+> The default values are used for all arguments except the first.
+
+> `fmt::format("{:2,,{}}, container, style.value);`<br>
+> The default values are used for all arguments except the first and
+> third.
 
 <br>
 
@@ -131,9 +130,62 @@ placed before the colon in `fmtster` format strings.*
 ---
 <br>
 
-## **Serialization Format** (Argument 1)
+## **Initial Indent** (Argument 1)
+
+The first argument indicates the starting number of tab units. This is added to
+the tabs used internally for formatting the serialization, so that the entire
+output is indented together. A value of 2 indicates two tab units. If the tab is
+set to two spaces, that would be a total of four spaces as a starting indent.
+
+**NOTE**: The indent specifier may be ignored on the first line of
+serialization, when certain style settings are chosen.<br>
+
+---
 <br>
-The first argument (after the colon, before the closing brace or the first
+
+## **Per-Call Parameters** (Argument 2)
+
+The second argument allows some single-call flags to be provided:
+
+  * `-` ... negate (disable) the option which follows; **no default**
+  * `f` ... the serialization format specified in the fourth argument (JSON,
+    etc.) will become the new default serialization format (since only the JSON
+    format is supported as of this release this option does nothing at present);
+    **default is negated**
+  * `s` ... the style specified in the third argument will become the new
+    default for the associated serialization format; **default is negated**
+  * `b` ... braces/brackets will be added around the container output (this
+    setting only applies to the outermost container in a compound container
+    (internal containers will always have braces/brackets); using this flag to
+    disable braces is useful for manual construction of complex objects into
+    the JSON output, especially when combining multiple container contents into
+    the same JSON object--see `example-json.cpp`); **default is enabled**
+
+---
+<br>
+
+## **Format Style** (Argument 3)
+
+The third argument holds the JSON serialization format style specifier. This
+allows the user to specify the output style of the JSON produced by `fmtster`.
+<br>
+<br>
+The serialization format style allows user choices for things like the position
+of opening and closing braces and brackets, the spacing between punctuation and
+values, as well as exceptional choices like grouping short or empty arrays on
+one line or placing single entry JSON objects on a single line, etc.<br>
+<br>
+`fmtster::JSONStyle` is the structure which provides these options for JSON.
+*(Currently, only the kind of tab (hard or space) and number of tab characters
+are configurable.)*
+<br>
+
+---
+<br>
+
+## **Serialization Format** (Argument 4)
+<br>
+The fourth argument (after the colon, before the closing brace or the first
 comma) indicates the serialization format.
 
 The serialization formats supported and their associated specification values
@@ -155,70 +207,19 @@ The ***default*** serialization format is 0 (JSON).
 ---
 <br>
 
-## **Format Style** (Argument 2)
-
-The second argument holds the JSON serialization format style specifier. This
-allows the user to specify the output style of the JSON produced by `fmtster`.
-<br>
-<br>
-The serialization format style allows user choices for things like the position
-of opening and closing braces and brackets, the spacing between punctuation and
-values, as well as exceptional choices like grouping short or empty arrays on
-one line or placing single entry JSON objects on a single line, etc.<br>
-<br>
-`fmtster::JSONStyle` is the structure which provides these options for JSON.
-*(Currently, only the kind of tab (hard or space) and number of tab characters
-are configurable.)*
-<br>
-
----
-<br>
-
-## **Per-Call Parameters** (Argument 3)
-
-The third argument allows some single-call flags to be provided:
-
-  * `-` ... negate (disable) the option which follows; **no default**
-  * `f` ... the serialization format specified in the first argument (JSON,
-    etc.) will become the new default serialization format (since only the JSON
-    format is supported as of this release this option does nothing at present);
-    **default is negated**
-  * `s` ... the style specified in the second argument will become the new
-    default for the associated serialization format; **default is negated**
-  * `b` ... braces/brackets will be added around the container output (this
-    setting only applies to the outermost container in a compound container
-    (internal containers will always have braces/brackets); using this flag to
-    disable braces is useful for manual construction of complex objects into
-    the JSON output, especially when combining multiple container contents into
-    the same JSON object--see `example-json.cpp`); **default is enabled**
-
----
-<br>
-
-## **Initial Indent** (Argument 4)
-
-The fourth argument indicates the starting number of tab units. This is added to
-the tabs used internally for formatting the serialization, so that the entire
-output is indented together. A value of 2 indicates two tab units. If the tab is
-set to two spaces, that would be a total of four spaces as a starting indent.
-
-**NOTE**: The indent specifier may be ignored on the first line of
-serialization, when certain style settings are chosen.<br>
-
----
-<br>
-
 ## **Nested Arguments**
 <br>
 
 As with other {fmt} arguments, direct values can be used or values can be
 provided via additional arguments. For example:
 
-### **Serialization Format**
-    // format accepts an integer or (C or C++) string
-    cout << F("{:{}}", container, 0) << endl;
-    cout << F("{:{}}", container, "json") << endl;
-    cout << F("{:{}}", container, "JSON"s) << endl;
+### **Initial Indent**
+    // indent accepts an integer
+    cout << F("{:{}}", container, indent) << endl;
+
+### **Per-Call Parameters**
+    // per-call-parameters accept a (C or C++ string)
+    cout << F("{:,{}}", container, "-b") << endl;
 
 ### **Format Style***
     // style accepts a very large integer that is a union with a
@@ -227,15 +228,13 @@ provided via additional arguments. For example:
     // format specified by the first argument)
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    cout << F("{:,{}}", container, style.value) << endl;
+    cout << F("{:,,{}}", container, style.value) << endl;
 
-### **Per-Call Parameters**
-    // per-call-parameters accept a (C or C++ string)
-    cout << F("{:,,{}}", container, "-b") << endl;
-
-### **Initial Indent**
-    // indent accepts an integer
-    cout << F("{:,,,{}}", container, indent) << endl;
+### **Serialization Format**
+    // format accepts an integer or (C or C++) string
+    cout << F("{:,,,{}}", container, 0) << endl;
+    cout << F("{:,,,{}}", container, "json") << endl;
+    cout << F("{:,,,{}}", container, "JSON"s) << endl;
 
 ---
 <br>
@@ -275,7 +274,7 @@ To change the default serialization format, use the per-call-parameter argument
 (`f`) in any serialization call using the desired default serialization format:
 
     // set the default serialization format to JSON
-    cout << F("{:json,,f}", container) << endl;
+    cout << F("{:,f,,json}", container) << endl;
 
     // the following line will print exactly the same output as the previous output
     cout << F("{}", container) << endl;
@@ -297,7 +296,7 @@ serialization format and desired default style for that format:
 
     // use the specified serialization format and associated style and set both
     // to the new defaults for each
-    cout << F("{:j,{},fs}", container, style.value) << endl;
+    cout << F("{:,fs,{},j}", container, style.value) << endl;
 
     // the following line will print exactly the same output as the previous output
     cout << F("{}", container) << endl;
@@ -353,10 +352,10 @@ specialized structure/classes. For example:
             return format_to(ctx.out(),
                              "{:{},{},{},{}}",
                              tup,
-                             mFormatSetting,
-                             mStyleValue,
+                             mIndentSetting,
                              mDisableBras ? "-b" : "",
-                             mIndentSetting);
+                             mStyleValue,
+                             mFormatSetting)
         }
     };
 
@@ -365,7 +364,7 @@ specialized structure/classes. For example:
     style.tabCount = 4;
 
     // output the custom struct with fmster style
-    cout << F("Colors: {:j,{}}", colors, style.value) << endl;
+    cout << F("Colors: {:,,{},j}", colors, style.value) << endl;
 The resulting output of this code:
 
     Colors: {

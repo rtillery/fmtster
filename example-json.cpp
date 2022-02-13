@@ -100,10 +100,10 @@ struct fmt::formatter<Person1>
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("name"s, p.name),
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          "-b",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
 
         // @@@ TODO: Wrap this section for use with C++20
         stringstream ss;
@@ -114,33 +114,33 @@ struct fmt::formatter<Person1>
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("birthdate"s, ss.str()),
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          "-b",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("salary"s, p.salary),
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          "-b",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("phones"s, p.phones),
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          "-b",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
 
         // Note this entry's format string does not end a comma
         itFC = format_to(itFC,
                          "{:{},{},{},{}}",
                          mp("family"s, p.family),
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          "-b",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
 
         if (!mDisableBras)
             itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
@@ -176,10 +176,10 @@ struct fmt::formatter<Person2>
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
                          tup,
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          mDisableBras ? "-b" : "",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
     }
 };
 
@@ -242,10 +242,10 @@ struct fmt::formatter<Color>
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
                          tup,
-                         mFormatSetting,
-                         mStyleValue,
+                         mIndentSetting,
                          mDisableBras ? "-b" : "",
-                         mIndentSetting);
+                         mStyleValue,
+                         mFormatSetting);
     }
 };
 
@@ -319,13 +319,13 @@ int main()
     // make 4-space tab the default for JSON
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    F("{:j,{},s}", mt(), style.value);
+    F("{:,s,{},j}", mt(), style.value);
 
     // print list of customized colors using specialized template above
     cout << F("Colors: {}", colors) << endl;
 
     // restore original default style for JSON
-    F("{:j,{},s}", mt(), fmtster::JSONStyle{}.value);
+    F("{:,s,{},j}", mt(), fmtster::JSONStyle{}.value);
 
     cout << "\n\n" << endl;
 
@@ -344,8 +344,8 @@ int main()
 
         // "-b" disables braces around the objects
         // 2 initial indents: 1 for the brace (above) + 1 more for the data inside
-        cout << F("{:,,-b,2},\n", mp("name"s, std::get<0>(pr)));
-        cout << F("{:,,-b,2}\n", std::get<1>(pr));
+        cout << F("{:2,-b},\n", mp("name"s, std::get<0>(pr)));
+        cout << F("{:2,-b}\n", std::get<1>(pr));
 
         // care must be taken to properly handle JSON commas
         cout << (--count ? "  },\n" : "  }\n");

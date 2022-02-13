@@ -624,7 +624,7 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDump_HardTabStruct)
     style.tabCount = 1;
     // change reference string to use hard tabs in style
     gRef = ReplaceString(gRef, "  ", "\t");
-    auto str = F("{:,{}}", style, style.value);
+    auto str = F("{:,,{},j}", style, style.value);
     ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
 }
 
@@ -634,7 +634,7 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefault)
     fmtster::JSONStyle style;
     style.hardTab = true;
     style.tabCount = 1;
-    F("{:,{},s}", make_tuple(), style.value);
+    F("{:,s,{},j}", make_tuple(), style.value);
     ASSERT_EQ(style.value, fmtster::Base::GetDefaultJSONStyle().value);
 }
 
@@ -648,14 +648,14 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
 TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
 {
     // return current default to initial default for following tests
-    auto str = F("{:,{},s}", make_tuple(), fmtster::JSONStyle{}.value);
+    auto str = F("{:,s,{},j}", make_tuple(), fmtster::JSONStyle{}.value);
     ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_Style_0)
 {
     vector<int> v = { 1, 2 };
-    auto str = F("{:,0}", v);
+    auto str = F("{:,,0}", v);
     string ref =
         "[\n"
         "  1,\n"
@@ -675,115 +675,115 @@ TEST_F(FmtsterTest, JSONStyle_4SpaceTab)
 TEST_F(FmtsterTest, JSONStyle_Format_0)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:0}", msi) << endl;
+    cout << F("{:,,,0}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_j)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:j}", msi) << endl;
+    cout << F("{:,,,j}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_J)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:J}", msi) << endl;
+    cout << F("{:,,,J}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_json)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:json}", msi) << endl;
+    cout << F("{:,,,json}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_JSON)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:JSON}", msi) << endl;
+    cout << F("{:,,,JSON}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_Json)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:Json}", msi) << endl;
+    cout << F("{:,,,Json}", msi) << endl;
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_1)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:1}", msi) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,1}", msi) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_x)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:x}", msi) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,x}", msi) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_X)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:X}", msi) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,X}", msi) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_xml)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:xml}", msi) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,xml}", msi) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_XML)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:XML}", msi) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,XML}", msi) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_Nested_0)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:{}}", msi, 0) << endl;
+    cout << F("{:,,,{}}", msi, 0) << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_Nested_String_0)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:{}}", msi, "0") << endl;
+    cout << F("{:,,,{}}", msi, "0") << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_Nested_j)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:{}}", msi, "j") << endl;
+    cout << F("{:,,,{}}", msi, "j") << endl;
 }
 
 TEST_F(FmtsterTest, JSONStyle_Format_Nested_J)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    cout << F("{:{}}", msi, "J") << endl;
+    cout << F("{:,,,{}}", msi, "J") << endl;
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_1)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:{}}", msi, 1) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,{}}", msi, 1) << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_string_1)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:{}}", msi, "1") << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,{}}", msi, "1") << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Format_Nested_string_x)
 {
     map<string, int> msi = { { "one", 1 }, { "two" , 2 } };
-    ASSERT_THROW(cout << F("{:{}}", msi, "x") << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,,{}}", msi, "x") << endl, fmt::format_error);
 }
 
 TEST_F(FmtsterTest, Fail_JSONStyle_Style_JSONStyleObject)
 {
     fmtster::JSONStyle style;
-    ASSERT_THROW(cout << F("{:,{}}", make_tuple(), style) << endl, fmt::format_error);
+    ASSERT_THROW(cout << F("{:,,{},j}", make_tuple(), style) << endl, fmt::format_error);
 }
 
 // value container tests
@@ -882,7 +882,7 @@ TEST_F(FmtsterTest, map_of_maps_of_strings_to_strings_to_JSON_4SpaceTab)
         "}";
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:,{}}", mapofmapofstrings, style.value);
+    string str = F("{:,,{},j}", mapofmapofstrings, style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -932,17 +932,17 @@ cout << "ONE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "\"foo\" : \"bar\", \"foobar\" : 7";
-    str = F("{:,,-b}, {:,,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:,-b}, {:,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
 cout << "TWO:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "{\n    \"foo\" : \"bar\"\n  }, {\n    \"foobar\" : 7\n  }";
-    str = F("{:,,,1}, {:,,,1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:1}, {:1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
 cout << "THREE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "  \"foo\" : \"bar\", \"foobar\" : 7";
-    str = F("{:,,-b,1}, {:,,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:1,-b}, {:,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
 cout << "FOUR:\n" << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -952,7 +952,7 @@ TEST_F(FmtsterTest, custom_indent_pairs)
     const string ref = "    \"fu\" : \"baz\", \"fubar\" : 3.14";
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:,{},-b,1}, {:,,-b}", make_pair("fu"s, "baz"s), style.value, make_pair("fubar"s, 3.14));
+    string str = F("{:1,-b,{},j}, {:,-b}", make_pair("fu"s, "baz"s), style.value, make_pair("fubar"s, 3.14));
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -965,7 +965,7 @@ TEST_F(FmtsterTest, NestedPairs)
         "}";
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:,{},-b}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
+    string str = F("{:,-b,{},j}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -973,7 +973,7 @@ cout << str << endl;
         "    \"foo\" : {\n"
         "        \"bar\" : \"baz\"\n"
         "    }";
-    str = F("{:,{},-b,1}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
+    str = F("{:1,-b,{},j}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -1008,7 +1008,7 @@ cout << str << endl;
         "        ]\n"
         "    }\n"
         "}";
-    str = F("{:,{},-b}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
+    str = F("{:,-b,{},j}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -1025,7 +1025,7 @@ cout << str << endl;
     "            ]\n"
     "        }\n"
     "    }";
-    str = F("{:,{},-b,1}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
+    str = F("{:1,-b,{},j}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -1083,7 +1083,7 @@ TEST_F(FmtsterTest, Tuple)
         make_pair("boolean"s, true));
     fmtster::JSONStyle style;
     style.tabCount = 4;
-   string str = F("{:,{},-b,1}", tup, style.value);
+   string str = F("{:1,-b,{},j}", tup, style.value);
     string ref =
         R"(    "int" : 25,)" "\n"
         R"(    "string" : "Hello",)" "\n"
@@ -1097,7 +1097,7 @@ TEST_F(FmtsterTest, Tuple)
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
-    str = F("{:,{},,1}", tup, style.value);
+    str = F("{:1,,{},j}", tup, style.value);
     ref =
         "{\n"
         R"(        "int" : 25,)" "\n"
@@ -1122,21 +1122,21 @@ TEST_F(FmtsterTest, Layers)
     auto pr = make_pair("key"s, "value"s);
     string str = F("{}", pr);
     EXPECT_EQ("{\n  \"key\" : \"value\"\n}"s, str);
-    str = F("{:,,-b}", pr);
+    str = F("{:,-b}", pr);
     EXPECT_EQ("\"key\" : \"value\""s, str);
-    str = F("{:,,,1}", pr);
+    str = F("{:1}", pr);
     EXPECT_EQ("{\n    \"key\" : \"value\"\n  }"s, str);
-    str = F("{:,,-b,1}", pr);
+    str = F("{:1,-b}", pr);
     EXPECT_EQ("  \"key\" : \"value\""s, str);
     // tuple
     auto tup = make_tuple("string"s, 1, true, 3.14);
     str = F("{}", tup);
     EXPECT_EQ("{\n  \"string\",\n  1,\n  true,\n  3.14\n}"s, str);
-    str = F("{:,,-b}", tup);
+    str = F("{:,-b}", tup);
     EXPECT_EQ("\"string\",\n1,\ntrue,\n3.14"s, str);
-    str = F("{:,,,1}", tup);
+    str = F("{:1}", tup);
     EXPECT_EQ("{\n    \"string\",\n    1,\n    true,\n    3.14\n  }"s, str);
-    str = F("{:,,-b,1}", tup);
+    str = F("{:1,-b}", tup);
     EXPECT_EQ("  \"string\",\n  1,\n  true,\n  3.14"s, str);
     auto mm2 = multimap<string, map<string, int> >{ { "mm1"s, { { "one"s, 1 }, { "two"s, 2 }, { "three"s, 3 } } },
                                                     { "mm2"s, { { "four"s, 4 }, { "five"s, 5 } } },
@@ -1144,13 +1144,13 @@ TEST_F(FmtsterTest, Layers)
     str = F("{}", mm2);
     EXPECT_EQ("{\n  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]\n}"s,
               str);
-    str = F("{:,,-b}", mm2);
+    str = F("{:,-b}", mm2);
     EXPECT_EQ("\"mm1\" : [\n  {\n    \"seven\" : 7,\n    \"six\" : 6\n  },\n  {\n    \"one\" : 1,\n    \"three\" : 3,\n    \"two\" : 2\n  }\n],\n\"mm2\" : [\n  {\n    \"five\" : 5,\n    \"four\" : 4\n  }\n]"s,
               str);
-    str = F("{:,,,1}", mm2);
+    str = F("{:1}", mm2);
     EXPECT_EQ("{\n    \"mm1\" : [\n      {\n        \"seven\" : 7,\n        \"six\" : 6\n      },\n      {\n        \"one\" : 1,\n        \"three\" : 3,\n        \"two\" : 2\n      }\n    ],\n    \"mm2\" : [\n      {\n        \"five\" : 5,\n        \"four\" : 4\n      }\n    ]\n  }"s,
               str);
-    str = F("{:,,-b,1}", mm2);
+    str = F("{:1,-b}", mm2);
     EXPECT_EQ("  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]"s,
               str);
 }

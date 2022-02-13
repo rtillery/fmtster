@@ -55,7 +55,7 @@ using std::vector;
 
 // short helper alias for fmt::format() used by adding "using fmtster::F;" to
 //  client code
-template<typename ...Args>
+template<typename... Args>
 string F(std::string_view fmt, const Args&... args)
 {
     return fmt::format(fmt, args...);
@@ -572,10 +572,10 @@ public:
 struct Base
 {
 protected:
-    static constexpr size_t FORMAT_ARG_INDEX = 0;
-    static constexpr size_t STYLE_ARG_INDEX = 1;
-    static constexpr size_t PER_CALL_ARG_INDEX = 2;
-    static constexpr size_t INDENT_ARG_INDEX = 3;
+    static constexpr size_t INDENT_ARG_INDEX = 0;
+    static constexpr size_t PER_CALL_ARG_INDEX = 1;
+    static constexpr size_t STYLE_ARG_INDEX = 2;
+    static constexpr size_t FORMAT_ARG_INDEX = 3;
 
     // results of parsing for use in format()
     vector<string> mArgData;
@@ -984,10 +984,10 @@ struct fmt::formatter<T,
                 itFC = fmt::format_to(itFC,
                                       fmtStr,
                                       escVal,
-                                      mFormatSetting,
-                                      mStyleValue,
+                                      mIndentSetting,
                                       pcp,
-                                      mIndentSetting);
+                                      mStyleValue,
+                                      mFormatSetting);
             }
             else
             {
@@ -1047,10 +1047,10 @@ struct fmt::formatter<T,
             itFC = format_to(itFC,
                             fmtStr,
                             vals,
-                            mFormatSetting,
-                            mStyleValue,
+                            mIndentSetting,
                             "",
-                            mIndentSetting);
+                            mStyleValue,
+                            mFormatSetting);
         }
     } // format_loop() (multimaps)
 
@@ -1171,10 +1171,10 @@ struct fmt::formatter<std::pair<T1, T2> >
             itFC = format_to(itFC,
                             "{:{},{},{},{}}",
                             p.second,
-                            mFormatSetting,
-                            mStyleValue,
+                            mIndentSetting,
                             "",
-                            mIndentSetting);
+                            mStyleValue,
+                            mFormatSetting);
         }
         else
         {
@@ -1247,10 +1247,10 @@ struct fmt::formatter<std::tuple<Ts...> >
                         itFC = format_to(itFC,
                                          fmtStr,
                                          elem,
-                                         mFormatSetting,
-                                         mStyleValue,
+                                         mIndentSetting,
                                          pcp,
-                                         mIndentSetting);
+                                         mStyleValue,
+                                         mFormatSetting);
                     }
                     else
                     {
@@ -1323,10 +1323,10 @@ struct fmt::formatter<fmtster::JSONStyle>
         itFC = fmt::format_to(itFC,
                             "{:{},{},{},{}}",
                             tup,
-                            mFormatSetting,
-                            mStyleValue,
+                            mIndentSetting,
                             pcp,
-                            mIndentSetting);
+                            mStyleValue,
+                            mFormatSetting);
 
         return itFC;
     }
