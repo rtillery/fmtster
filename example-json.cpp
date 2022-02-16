@@ -36,6 +36,7 @@ using namespace std::string_literals;
 #include <tuple>
 using std::tuple;
 #include <utility>
+using std::make_pair;
 #include <variant>
 using std::variant;
 #include <vector>
@@ -43,6 +44,9 @@ using std::vector;
 
 #include "fmtster.h"
 using fmtster::F;
+
+#include <list>
+#include <cassert>
 
 
 template<typename T1, typename T2>
@@ -249,8 +253,104 @@ struct fmt::formatter<Color>
     }
 };
 
+
+
+using VALUE_T = fmtster::internal::VALUE_T;
+using JSONStyleHelper = fmtster::internal::JSONStyleHelper;
+
+template<typename TKEY, typename TOBJ>
+class LRU
+{
+protected:
+public:
+    using LRUList_t = std::list<TKEY>;
+    using Cache_t = std::map<TKEY, std::tuple<TOBJ, typename LRUList_t::iterator> >;
+    static constexpr size_t OBJ_INDEX = 0;
+    static constexpr size_t ITERATOR_INDEX = 1;
+
+    mutable LRUList_t mLRUList;
+    mutable Cache_t mCache;
+
+    const size_t mCacheLimit;
+
+    LRU(size_t limit = 1)
+      : mCacheLimit(limit ? limit : 1)
+    {
+        assert(limit);
+    }
+
+    TOBJ& getObj(const TKEY& key) const
+    {
+cout << __LINE__ << endl;
+        // get or create object in cache
+        auto [itTupPr, inserted] = mCache.emplace(key, make_pair(0.0, mLRUList.end()));
+        auto& pr = std::get<1>(*itTupPr);
+        auto& obj = std::get<0>(pr);
+        auto it = std::get<1>(pr);
+//         auto [obj, it] = *itTupObj;
+cout << F("tupObj: {} : {}, iterator", key, obj) << endl;
+
+cout << __LINE__ << endl;
+//         auto it = std::get<ITERATOR_INDEX>(*itTupObj);
+cout << __LINE__ << endl;
+        if (!inserted) // it == LRUList_t::end())
+        {
+cout << __LINE__ << endl;
+            // erase least recently used obj(s) if cache is full, to make room
+            // for new object
+            while (mLRUList.size() >= mCacheLimit)
+            {
+cout << __LINE__ << endl;
+                mCache.erase(*(mLRUList.rend()));
+                mLRUList.pop_back();
+            }
+
+cout << __LINE__ << endl;
+            // push newly created obj reference into front of LRU list
+            mLRUList.push_front(key);
+        }
+        else if (it != mLRUList.begin())
+        {
+            // move existing obj reference to front of LRU list
+cout << __LINE__ << endl;
+                mLRUList.splice(mLRUList.begin(), mLRUList, it);
+        }
+
+cout << __LINE__ << endl;
+        return obj; // std::get<OBJ_INDEX>(tupObj);
+    }
+};
+
+
+template<typename T>
+void DumpLRU(const T& lru)
+{
+    cout << F("lru ({}):", lru.mLRUList.size()) << endl;
+    for (auto val : lru.mLRUList)
+    {
+        auto tup = lru.mCache[val];
+        cout << F("{:1}\n", make_pair(val, std::get<T::OBJ_INDEX>(tup)));
+    }
+    cout << endl;
+cout << __LINE__ << endl;
+}
+
+
 int main()
 {
+cout << __LINE__ << endl;
+    LRU<string, float> lru(5);
+cout << __LINE__ << endl;
+    DumpLRU(lru);
+cout << __LINE__ << endl;
+    lru.getObj("pi") = 3.14;
+cout << __LINE__ << endl;
+    DumpLRU(lru);
+cout << __LINE__ << endl;
+
+    cout << "\n\n" << endl;
+
+
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
