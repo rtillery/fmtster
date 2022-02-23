@@ -24,9 +24,12 @@
 #define FMTSTER_VERSION 000500 // 0.5.0
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include <list>
+#include <mutex>
 #include <regex>
 #include <string>
 #include <type_traits>
@@ -374,18 +377,95 @@ public:
     struct JSONSTYLESTRUCT;
     internal::VALUE_T value;
 
-    JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value)
-      : value(val)
+    JSONStyle(internal::VALUE_T val = DEFAULTJSONCONFIG.value)
+      : value(val ? val : DEFAULTJSONCONFIG.value)
     {}
-
-    operator internal::VALUE_T() const
-    {
-        return value;
-    }
 };
 
 namespace internal
 {
+
+struct fnStyleLessThan
+{
+    bool operator()(const JSONStyle& left, const JSONStyle& right) const
+    {
+        return left.value < right.value;
+    }
+};
+
+// used to cache XXXStyleHelper expansions associated with XXXStyle unions
+template<typename TKEY, typename TOBJ, typename Compare = std::less<TKEY> >
+struct LRUCache
+{
+    using LRUList_t = std::list<TKEY>; // front is newest
+
+    using Cache_t = std::map<TKEY, 
+                             std::pair<std::shared_ptr<TOBJ>,
+                                       typename LRUList_t::const_iterator>,
+                             Compare>;
+    static constexpr size_t SHARED_PTR_OBJ_INDEX = 0;
+    static constexpr size_t LIST_ITERATOR_INDEX = 1;
+
+    const size_t mCacheLimit;
+
+    // the following are mutable because they are behind-the-scenes
+    // manipulation of implementation details
+    mutable std::mutex mMutex;
+
+    mutable LRUList_t mLRUList;
+    mutable Cache_t mCacheMap;
+
+    LRUCache(size_t limit = 1)
+      : mCacheLimit(limit ? limit : 1)
+    {
+        assert(limit);
+    }
+
+    // shared_ptr<> returned here to ensure that eviction of object by one
+    // thread, doesn't free object in use by another
+    // this function is const ???
+    std::shared_ptr<TOBJ> getObj(const TKEY& key) const
+    {
+        // allow only one thread at a time to manipulate containers
+        std::scoped_lock lock(mMutex);
+
+        // get or create object in cache
+        auto [itMap, inserted] =
+            mCacheMap.emplace(key,
+                              make_pair(std::make_shared<TOBJ>(key),
+                                        mLRUList.end()));
+        auto& prMapElem = *itMap;
+        auto& prMappedVal = std::get<1>(prMapElem);
+        auto& sptrObj = std::get<SHARED_PTR_OBJ_INDEX>(prMappedVal);
+
+        auto& itListMapped = std::get<LIST_ITERATOR_INDEX>(prMappedVal);
+
+        if (inserted) // itListMapped == LRUList_t::end()) // 
+        {
+            // erase least recently used obj(s) if cache is full, to make room
+            // for new object
+            while (mLRUList.size() >= mCacheLimit)
+            {
+                mCacheMap.erase(*(mLRUList.rbegin()));
+
+                mLRUList.pop_back();
+            }
+
+            // push newly created obj reference into front of LRU list
+            mLRUList.emplace_front(key);
+
+            // set iterator to top of list
+            itListMapped = mLRUList.begin();
+        }
+        else if (itListMapped != mLRUList.begin())
+        {
+            // move existing obj reference to front of LRU list
+            mLRUList.splice(mLRUList.begin(), mLRUList, itListMapped);
+        }
+
+        return sptrObj;
+    }
+}; // struct LRUCache<>
 
 // base class used by all serialization format style helpers
 struct StyleHelper
@@ -402,6 +482,8 @@ struct StyleHelper
     StyleHelper(VALUE_T val)
       : mStyle{val}
     {}
+
+    virtual ~StyleHelper() = default;
 
     template<typename T>
     T toValue(const char* sz, const string& throwArg = "")
@@ -475,40 +557,51 @@ struct StyleHelper
     {
         return formatToValue(str.data());
     }
-
-    virtual void updateExpansions()
-    {
-        throw std::bad_function_call();
-    }
 }; // StyleHelper
+
+class JSONStyleHelper;
+
+using JSONLRUCache_t = LRUCache<VALUE_T, JSONStyleHelper, fnStyleLessThan>;
 
 // wrapper of JSONStyle that expands configuration to strings used in output
 class JSONStyleHelper
   : public StyleHelper
 {
+    static VALUE_T& DefaultStyleValue()
+    {
+        static VALUE_T defaultStyleValue = JSONStyleHelper(0).mStyle.value;
+        return defaultStyleValue;
+    }
 
-    VALUE_T mLastStyleValue;
+    void expand()
+    {
+        const JSONStyle style(mStyle.value);
+        tab = style.hardTab
+              ? string(style.tabCount, '\t')
+              : string(style.tabCount, ' ');
+    }
 
 public:
-    JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
-      : StyleHelper(value ? value : DEFAULTJSONCONFIG.value),
-        mLastStyleValue(0)
+    static VALUE_T GetDefaultStyleValue()
     {
-        updateExpansions();
+        return DefaultStyleValue();
     }
 
-    JSONStyleHelper operator=(uint64_t value)
+    static void SetDefaultStyleValue(VALUE_T value)
     {
-        mStyle.value = value;
-        updateExpansions();
-        return *this;
+        DefaultStyleValue() = value;
     }
 
-    JSONStyleHelper operator=(const JSONStyle& style)
+    static JSONLRUCache_t& GetLRUCache()
     {
-        mStyle.value = style.value;
-        updateExpansions();
-        return *this;
+        static JSONLRUCache_t lruCache(5);
+        return lruCache;
+    }
+
+    JSONStyleHelper(VALUE_T val = DEFAULTJSONCONFIG.value)
+      : StyleHelper(val ? val : DEFAULTJSONCONFIG.value)
+    {
+        expand();
     }
 
     // Dummy escape function for all but strings
@@ -517,6 +610,7 @@ public:
     {
         return val;
     }
+
     // escape string the JSON way
     string escapeIfString(const string& strIn)
     {
@@ -552,19 +646,7 @@ public:
 
         return strOut;
     } // escapeIfString()
-
-    void updateExpansions()
-    {
-        if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
-        {
-            const JSONStyle style(mStyle.value);
-            tab = style.hardTab
-                  ? string(style.tabCount, '\t')
-                  : string(style.tabCount, ' ');
-            mLastStyleValue = mStyle.value;
-        }
-    }
-};
+}; // class JSONStyleHelper
 
 } // namespace internal
 
@@ -585,10 +667,10 @@ protected:
     int mFormatSetting;
 
     // from style arg
-    std::unique_ptr<internal::StyleHelper> mpStyleHelper;
-    std::reference_wrapper<internal::VALUE_T> mStyleValue;
+    internal::VALUE_T mStyleValue;
+    std::shared_ptr<internal::StyleHelper> mpStyleHelper;
 
-    // from indent
+    // from indent art
     size_t mIndentSetting;
 
     // from per call parms
@@ -606,11 +688,12 @@ protected:
         return defaultFormat;
     };
 
-    static internal::JSONStyleHelper& DefaultJSONStyleHelper()
+    static void SetDefaultFormat(int format)
     {
-        static internal::JSONStyleHelper defaultStyleHelper(0);
-        return defaultStyleHelper;
-    };
+        if (format != 0)
+            throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
+        DefaultFormat() = format;
+    }
 
     template<typename T>
     T escapeIfString(int format, const T& val)
@@ -618,10 +701,16 @@ protected:
         switch (format)
         {
         case 0:
-            return dynamic_cast<internal::JSONStyleHelper*>(mpStyleHelper.get())->escapeIfString(val);
+        {
+            internal::StyleHelper* pStyleHelper = mpStyleHelper.get();
+            internal::JSONStyleHelper* pJSONStyleHelper =
+                dynamic_cast<internal::JSONStyleHelper*>(pStyleHelper);
+            return pJSONStyleHelper->escapeIfString(val);
+        }
+//             return dynamic_cast<internal::JSONStyleHelper*>(mpStyleHelper.get())->escapeIfString(val);
 
         default:
-            throw fmt::format_error("fmtster: Shouldn't get here, because unsupported format should have already been thrown");
+            throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
         }
     }
 
@@ -634,38 +723,34 @@ public:
         return DefaultFormat();
     }
 
-    static const JSONStyle& GetDefaultJSONStyle()
-    {
-        return DefaultJSONStyleHelper().mStyle.jsonStyle;
-    }
+    // specialized functions below Base definition
+    template<typename T>
+    static const T GetDefaultStyle();
 
     Base()
       : mArgData{ "" },
         mNestedArgIndex{ 0 },
         mFormatSetting(GetDefaultFormat()),
-        mpStyleHelper(new internal::JSONStyleHelper(GetDefaultJSONStyle())), // helper for default format
-        mStyleValue(mpStyleHelper->mStyle.value),
         mIndentSetting(0),
         mDisableBras(false)
-    {}
+    {
+        switch (mFormatSetting)
+        {
+        case 0:
+            mStyleValue = internal::JSONStyleHelper::GetDefaultStyleValue();
+            break;
 
-    // Parses the format in the format {<format>,<style>,<tab>,<indent>}.
-    // > format (default is 0: JSON):
-    //     0 = JSON
-    // >     style (default is 0):
-    //         0 = open brace/bracket on same line as key, each property on new line
-    //         1 = same as 0 with no open/close braces/brackets
-    // > tab (default is 2 spaces):
-    //     positive integers: spaces
-    //     0: no tab
-    //     negative integers: hard tabs
-    // > indent (default is 0):
-    //     positive integers: number of <tab>s to start the indent
+        default:
+            throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
+        }
+    }
+
+    // Generic parser for however many comma-separated arguments are provided,
+    // including support for nested arguments (requires call to
+    // Base::resolveArgs() in Base children's format())
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-        // generic handling of N comma-separated arguments, including recursive braces
-
         int parmIndex = 0;
         int braces = 1;
         auto it = ctx.begin();
@@ -697,29 +782,17 @@ public:
         }
 
         return it;
+
     } // parse()
 
-
-
-    // This function must be called by each Base child immediately on
-    //  entry to the format() function. It completes the updating of the style
-    //  object based on arguments provided, if necessary.
+    //
+    // format
+    //
     template<typename FormatContext>
-    void resolveArgs(FormatContext& ctx)
+    void resolveFormatArg(FormatContext& ctx)
     {
-        using namespace std::string_literals;
-        using fmt::format_to;
         using namespace fmtster::internal;
 
-        // ensure vectors are large enough for unchecked processing below
-        mArgData.resize(4, "");
-        mNestedArgIndex.resize(4, 0);
-
-
-
-        //
-        // format
-        //
         if (mNestedArgIndex[FORMAT_ARG_INDEX])
         {
             auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_ARG_INDEX]);
@@ -749,31 +822,30 @@ public:
                 formatArg
             );
 
-            mFormatSetting = formatSetting;
+            mFormatSetting = mpStyleHelper->formatToValue(formatSetting);
         }
         else if(!mArgData[FORMAT_ARG_INDEX].empty())
         {
             mFormatSetting = mpStyleHelper->formatToValue(mArgData[FORMAT_ARG_INDEX]);
         }
-        else
-        {
-            mFormatSetting = GetDefaultFormat();
-        }
+    } // resolveFormatArg()
 
+    //
+    // style
+    //
+    template<typename FormatContext>
+    void resolveStyleArg(FormatContext& ctx)
+    {
+        using namespace fmtster::internal;
 
-
-        //
-        // style
-        //
-        VALUE_T styleSetting = 0;
         if (mNestedArgIndex[STYLE_ARG_INDEX])
         {
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_ARG_INDEX]);
-            styleSetting = visit_format_arg(
+            mStyleValue = visit_format_arg(
                 [](auto value) -> VALUE_T
                 {
                     // This construct is required because at compile time all
-                    //  type paths are linked, even though that are not allowed
+                    //  type paths are linked, even though they are not allowed
                     //  at run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
@@ -792,29 +864,28 @@ public:
         }
         else if(!mArgData[STYLE_ARG_INDEX].empty())
         {
-            auto styleSetting = mpStyleHelper->toValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
+            mStyleValue = mpStyleHelper->toValue<VALUE_T>(mArgData[STYLE_ARG_INDEX]);
         }
 
         switch (mFormatSetting)
         {
         case 0:
-            if (!styleSetting)
-                styleSetting = GetDefaultJSONStyle().value;
-            mpStyleHelper.reset(new internal::JSONStyleHelper(styleSetting));
+            mpStyleHelper = JSONStyleHelper::GetLRUCache().getObj(mStyleValue);
             break;
 
         default:
-            throw fmt::format_error("fmtster (style): Shouldn't get here, because unsupported format should have already been thrown");
+            throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
         }
+    } // resolveStyleArg()
 
-        mStyleValue = mpStyleHelper->mStyle.value;
+    //
+    // perm call parms
+    //
+    template<typename FormatContext>
+    string resolvePCPArg(FormatContext& ctx)
+    {
+        using namespace fmtster::internal;
 
-
-
-
-        //
-        // perm call parms
-        //
         string pcpSetting;
         if (mNestedArgIndex[PER_CALL_ARG_INDEX])
         {
@@ -827,9 +898,13 @@ public:
                     {
                         return value;
                     }
+                    else if constexpr (std::is_same_v<simplify_type<fmt::string_view>, simplify_type<decltype(value)> >)
+                    {
+                        return value.data();
+                    }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: (only strings accepted)",
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: {} (only strings accepted)",
                                                   typeid(value).name()));
                     }
                 },
@@ -840,11 +915,17 @@ public:
             pcpSetting = mArgData[PER_CALL_ARG_INDEX];
         }
 
+        return pcpSetting;
+    } // resolvePCPArg()
 
+    //
+    // indent
+    //
+    template<typename FormatContext>
+    void resolveIndentArg(FormatContext& ctx)
+    {
+        using namespace fmtster::internal;
 
-        //
-        // indent
-        //
         if (mNestedArgIndex[INDENT_ARG_INDEX])
         {
             auto indentArg = ctx.arg(mNestedArgIndex[INDENT_ARG_INDEX]);
@@ -857,7 +938,7 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: (only integers accepted)",
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: {} (only integers accepted)",
                                                   typeid(value).name()));
                     }
                 },
@@ -875,21 +956,37 @@ public:
             mIndentSetting = 0;
         }
 
+    } // resolveIndentArg()
 
+    // This function must be called by each Base child immediately on
+    //  entry to the format() function. It completes the updating of the style
+    //  object based on arguments provided, if necessary.
+    template<typename FormatContext>
+    void resolveArgs(FormatContext& ctx)
+    {
+        using namespace std::string_literals;
+        using fmt::format_to;
 
+        // ensure vectors are large enough for unchecked processing below
+        mArgData.resize(4, "");
+        mNestedArgIndex.resize(4, 0);
 
-        mpStyleHelper->updateExpansions();
+        resolveFormatArg(ctx);
+        resolveStyleArg(ctx);
+        auto pcpSetting = resolvePCPArg(ctx);
+        resolveIndentArg(ctx);
 
-        // expand indenting
+        //
+        // configure indentation
+        //
         mBraIndent.clear();
         for (auto i = mIndentSetting; i; --i)
             mBraIndent += mpStyleHelper->tab;
         mDataIndent = mBraIndent + mpStyleHelper->tab;
 
-
-
-
-        // parse those parms
+        //
+        // parse the per call parms
+        //
         bool negate = false;
         for (const auto c : pcpSetting)
         {
@@ -901,7 +998,7 @@ public:
 
             case 'f':
                 if (!negate)
-                    DefaultFormat() = mFormatSetting;
+                    SetDefaultFormat(mFormatSetting);
                 break;
 
             case 's':
@@ -910,11 +1007,11 @@ public:
                     switch (mFormatSetting)
                     {
                     case 0:
-                        DefaultJSONStyleHelper() = *dynamic_cast<JSONStyleHelper*>(mpStyleHelper.get());
+                        internal::JSONStyleHelper::SetDefaultStyleValue(mStyleValue);
                         break;
 
                     default:
-                        throw fmt::format_error("fmtster (pcp): Shouldn't get here, because unsupported format should have already been thrown");
+                        throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
                     }
                 }
                 break;
@@ -924,9 +1021,18 @@ public:
             }
 
             negate = (c == '-');
-        }
+
+        } /// for(const auto c : pcpSetting)
+
     } // resolveArgs()
+
 }; // struct FmtterBase
+
+template<>
+const JSONStyle Base::GetDefaultStyle()
+{
+    return JSONStyle(internal::JSONStyleHelper::GetDefaultStyleValue());
+}
 
 } // namespace fmtster
 
@@ -1091,7 +1197,9 @@ struct fmt::formatter<T,
         }
 
         return itFC;
-    }
+
+    } // format()
+
 }; // struct fmt::formatter< containers >
 
 // fmt::formatter<> for adapters (wraps containers & removes some functions)
@@ -1295,6 +1403,7 @@ struct fmt::formatter<fmtster::JSONStyle>
         auto itFC = ctx.out();
 
         const auto tup = std::make_tuple(
+            make_pair("value"s, style.value),
 #if false // @@@ disable members that are not implemented
             make_pair("cr"s, style.cr),
             make_pair("lf"s, style.lf),

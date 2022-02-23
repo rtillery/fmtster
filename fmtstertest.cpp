@@ -563,6 +563,7 @@ std::string ReplaceString(std::string subject,
 // initial default style
 static string gRef =
     "{\n"
+    "  \"value\" : 4,\n"
 #if false // @@@ disable members that are not implemented
     "  \"cr\" : false,\n"
     "  \"lf\" : true,\n"
@@ -600,7 +601,7 @@ TEST_F(FmtsterTest, JSONStyle_StructDefaultDump)
 TEST_F(FmtsterTest, JSONStyle_InitialDefaultDump)
 {
     // current default should match initial default
-    auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
+    auto str = F("{}", fmtster::Base::GetDefaultStyle<fmtster::JSONStyle>());
     ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
 }
 
@@ -611,6 +612,7 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDump)
     style.hardTab = true;
     style.tabCount = 1;
     // change reference string to change values (style still default)
+    gRef = ReplaceString(gRef, "\"value\" : 4", "\"value\" : 3");
     gRef = ReplaceString(gRef, "\"hardTab\" : false", "\"hardTab\" : true");
     gRef = ReplaceString(gRef, "\"tabCount\" : 2", "\"tabCount\" : 1");
     auto str = F("{}", style);
@@ -635,13 +637,13 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefault)
     style.hardTab = true;
     style.tabCount = 1;
     F("{:,s,{},j}", make_tuple(), style.value);
-    ASSERT_EQ(style.value, fmtster::Base::GetDefaultJSONStyle().value);
+    ASSERT_EQ(style.value, fmtster::Base::GetDefaultStyle<fmtster::JSONStyle>().value);
 }
 
 TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
 {
     // serialize current default (with current default style) & compare to reference
-    auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
+    auto str = F("{}", fmtster::Base::GetDefaultStyle<fmtster::JSONStyle>());
     ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
 }
 
@@ -649,7 +651,7 @@ TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
 {
     // return current default to initial default for following tests
     auto str = F("{:,s,{},j}", make_tuple(), fmtster::JSONStyle{}.value);
-    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
+    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultStyle<fmtster::JSONStyle>().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_Style_0)

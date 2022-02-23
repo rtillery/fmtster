@@ -25,7 +25,7 @@ LFLAGS=
 LIBS=-lpthread -lfmt
 TESTLIBS=-lgtest -lgtest_main
 
-all: fmtstertest example-json
+all: fmtstertest example-json insert
 
 fmtstertest.o: fmtstertest.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
@@ -38,5 +38,12 @@ example-json.o: example-json.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 example-json: example-json.o
+	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
+#	strip $@
+
+insert.o: insert.cpp Makefile
+	$(CXX) $(CFLAGS) -c $< -o $@
+
+insert: insert.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
 #	strip $@
