@@ -1,4 +1,6 @@
 # **`fmtster` Change List**
+## **0.5.1**
+* Added internal LRU cache to improve efficiency
 ## **0.5.0**
 * Reordered arguments to help minimize empty arguments (see README.md), and in
   anticipation of a future change which might eliminate the need for the fourth

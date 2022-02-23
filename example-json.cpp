@@ -42,11 +42,11 @@ using std::variant;
 #include <vector>
 using std::vector;
 
-#include "fmtster.h"
-using fmtster::F;
-
 #include <list>
 #include <cassert>
+
+#include "fmtster.h"
+using fmtster::F;
 
 
 template<typename T1, typename T2>
@@ -258,76 +258,6 @@ struct fmt::formatter<Color>
                          mFormatSetting);
     }
 };
-
-// template<typename... Ts>
-// struct fmt::formatter<LRUCache<Ts...> >
-//   : fmtster::Base
-// {
-//     template<typename FormatContext>
-//     auto format(const LRUCache<Ts...>& lruCache, FormatContext& ctx)
-//     {
-//         using std::make_pair;
-
-//         resolveArgs(ctx);
-
-//         auto itFC = ctx.out();
-
-//         if (!mDisableBras)
-//         {
-//             itFC = format_to(itFC, "{{\n");
-//             mIndentSetting++;
-//         }
-
-//         auto remaining = lruCache.mLRUList.size();
-//         for (const auto& key : lruCache.mLRUList)
-//         {
-//             const auto& prMappedVal = lruCache.mCacheMap.at(key);
-//             itFC = format_to(itFC,
-//                             --remaining ? "{:{},{},{},{}},\n" : "{:{},{},{},{}}",
-//                             make_pair(key,
-//                                       *std::get<LRUCache<Ts...>::SHARED_PTR_OBJ_INDEX>(prMappedVal)),
-//                             mIndentSetting,
-//                             "-b",
-//                             mStyleValue,
-//                             mFormatSetting);
-//         }
-
-//         if (!mDisableBras)
-//             itFC = format_to(itFC, "\n{}}}", mBraIndent);
-
-//         return itFC;
-//     }
-// };
-
-// template<>
-// struct fmt::formatter<JSONStyleHelper>
-//   : fmtster::Base
-// {
-//     template<typename FormatContext>
-//     auto format(const JSONStyleHelper& sh, FormatContext& ctx)
-//     {
-//         using std::make_pair;
-
-//         resolveArgs(ctx);
-
-//         auto itFC = ctx.out();
-
-//         auto tup = std::make_tuple(
-//             make_pair("tab", sh.tab)
-//         );
-
-//         auto pcp = mDisableBras ? "-b" : "";
-//         itFC = format_to(itFC,
-//                          "{:{},{},{},{}}",
-//                          tup,
-//                          mIndentSetting,
-//                          "",
-//                          mStyleValue,
-//                          mFormatSetting);
-
-//         return itFC;
-//     }
-// };
 
 int main()
 {
