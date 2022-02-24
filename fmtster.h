@@ -309,14 +309,14 @@ struct MeasureJSONStyle JSONSTYLESTRUCT;
 // can use 128 bits. NOTE: VALUE_T is meant to be the maximum size necessary
 // to be used for all XXXStyle unions.
 template<size_t bytes>
-using VALUE_TYPE =
+using VALUE_T_SELECTOR =
     std::conditional_t<(bytes <= 8),
                        uint64_t,
-                       std::conditional_t<(bytes > 8) && (bytes <= 16),
+                       std::conditional_t<((bytes > 8) && (bytes <= 16)),
                                           __uint128_t,
                                           void>
                       >;
-using VALUE_T = VALUE_TYPE<sizeof(MeasureJSONStyle)>;
+using VALUE_T = VALUE_T_SELECTOR<16 /* sizeof(MeasureJSONStyle) */>;
 
 //
 // Used to define the DEFAULTxxxCONFIG instances before their use as default
@@ -406,7 +406,7 @@ namespace internal
 // Templated structure used to cache XXXStyleHelper expansions associated with
 // XXXStyle unions (via XXXStyle.value).
 //
-template<typename TVALUE, typename TSTYLEHELPER, typename Compare = std::less<TVALUE> >
+template<typename TVALUE, typename TSTYLEHELPER, typename Compare = std::map<int, int>::key_compare>
 struct LRUCache
 {
     using LRUList_t = std::list<TVALUE>; // FRONT (index 0) is NEWEST
@@ -518,8 +518,8 @@ struct StyleHelper
                     else
                     {
                         throw fmt::format_error(F("fmtster: unsupported {} argument: \"{}\"",
-                                                throwArg,
-                                                sz));
+                                                  throwArg,
+                                                  sz));
                     }
                 }
                 val = (val * 10) + (c - '0');
