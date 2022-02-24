@@ -96,6 +96,7 @@ specific value, separated by commas
 * Initial Indent
 * Per-Call Parameters
 * Format Style
+* Format
 > `{`\<index>`:`\<indent>`,`\<per-call-parms>`,`\<style>`,`\<format>`}`
 
 <br>

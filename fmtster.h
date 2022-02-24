@@ -374,7 +374,7 @@ public:
     struct JSONSTYLESTRUCT;
     internal::VALUE_T value;
 
-    JSONStyle(uint64_t val = DEFAULTJSONCONFIG.value)
+    JSONStyle(internal::VALUE_T val = DEFAULTJSONCONFIG.value)
       : value(val)
     {}
 
@@ -486,7 +486,6 @@ struct StyleHelper
 class JSONStyleHelper
   : public StyleHelper
 {
-
     VALUE_T mLastStyleValue;
 
 public:
