@@ -53,29 +53,106 @@ using std::disjunction_v;
 using std::negation;
 using std::vector;
 
-// short helper alias for fmt::format() used by adding "using fmtster::F;" to
-//  client code
+//
+// Short helper alias for fmt::format() used by adding "using fmtster::F;" to
+// client code
+//
 template<typename... Args>
 string F(std::string_view fmt, const Args&... args)
 {
     return fmt::format(fmt, args...);
 }
 
-struct Base; // forward declaration
+//
+// Enumeration for use in fmtster::JSONStyle (defined below)
+//
+enum JSS
+{
+    BLANK               = 0x0,
+    reserved_1          = 0x1,
+    SPACE               = 0x2,
+    SPACEx2             = 0x3,
+    reserved_4          = 0x4,
+    reserved_5          = 0x5,
+    TAB                 = 0x6,
+    TABx2               = 0x7,
+    NEWLINE             = 0x8,
+    reserved_9          = 0x9,
+    NEWLINE_SPACE       = 0xA,
+    NEWLINE_SPACEx2     = 0xB,
+    reserved_C          = 0xC,
+    reserved_D          = 0xD,
+    NEWLINE_TAB         = 0xE,
+    NEWLINE_TABx2       = 0xF
+}; // enum JSS
+
+//
+// Definition of XXXStyle structures, reused multiple times below
+//
+#if false // @@@ TODO: Implement members commented out below
+
+#define JSONSTYLESTRUCT                                                        \
+    {                                                                          \
+        /* note that these two booleans can never both be false, so they  */   \
+        /* double as a method of differentiating a default-meaning 0 from */   \
+        /* an actual configuration setting (i.e. 0 always means default)  */   \
+        bool cr : 1;                                                           \
+        bool lf : 1;                                                           \
+                                                                               \
+        bool hardTab : 1;                                                      \
+        unsigned int tabCount : 4;                                             \
+                                                                               \
+        /* [ <gap A> value, <gap B> value <gap C> ] */                         \
+        unsigned int gapA : 4;                                                 \
+        unsigned int gapB : 4;                                                 \
+        unsigned int gapC : 4;                                                 \
+                                                                               \
+        /* { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> } */ \
+        unsigned int gap1 : 4;                                                 \
+        unsigned int gap2 : 4;                                                 \
+        unsigned int gap3 : 4;                                                 \
+        unsigned int gap4 : 4;                                                 \
+        unsigned int gap5 : 4;                                                 \
+        unsigned int gap6 : 4;                                                 \
+        unsigned int gap7 : 4;                                                 \
+                                                                               \
+        unsigned int emptyArray : 2;                                           \
+        unsigned int emptyObject : 2;                                          \
+        unsigned int sva : 2;                                                  \
+        unsigned int svo : 2;                                                  \
+    }
+
+#else
+
+// @@@ TODO: See above (only these are currently implemented)
+#define JSONSTYLESTRUCT                                                        \
+    {                                                                          \
+        bool hardTab : 1;                                                      \
+        unsigned int tabCount : 4;                                             \
+    }
+
+#endif // true
+
+// forward declaration
+struct Base;
 
 namespace internal
 {
 
+// Needed in the has_FN<> macro below
 template<typename>
 struct fmtster_true
   : true_type
 {};
 
+//
+// Template to simplify a type to its base for comparisons below
+//
 template<typename T>
 using simplify_type = std::remove_cv_t<std::remove_reference_t<T> >;
 
 //
-// macro to create has_FN<> templates (also creates has_FN_v<> helper)
+// Macro to create has_FN<> templates and has_FN_v<> helpers
 //
 #define fmtster_MAKEHASFN(FN)                                                  \
 template<typename T, typename... Args>                                         \
@@ -94,7 +171,7 @@ template<typename ...Ts>                                                       \
 inline constexpr bool has_ ## FN ## _v = has_ ## FN<Ts...>::value
 
 //
-// macro to create has_TYPE<> templates (also creates has_TYPE_v<> helper)
+// Macro to create has_TYPE<> templates and has_TYPE_v<> helpers
 //
 #define fmtster_MAKEHASTYPE(TYPE)                                              \
 template<typename T, typename = void>                                          \
@@ -111,17 +188,16 @@ template<typename ...Ts>                                                       \
 inline constexpr bool has_ ## TYPE ## _v = has_ ## TYPE<Ts...>::value
 
 //
-// macro to create is_ID<> templates (also creates is_ID_v<> helper)
-//   COND provides the conditional value used to check traits
+// Macro to create is_ID<> templates and is_ID_v<> helpers
+//     COND provides the conditional value used to check traits
 //
-// NOTE 1: Any spaces or angle brackets (greater-than or less-than) in the
-//         CONDition argument are misinterpreted by the parser, so use of
-//         parentheses around this argument is recommended.
-// NOTE 2: CONDition _can_ be a logical grouping of xxx_v<> values, but it
-//         appears that all of these are evaluated, making some combinations
-//         fail before the SFINAE can kick in. std::conjunction_v<> &
-//         std::disjunction_v<> seem to use lazy evaluation, so use of them
-//         is preferred.
+// NOTE 1: Any spaces or angle brackets in the COND argument are
+//         misinterpreted by the parser, so use of parentheses is necessary
+// NOTE 2: COND _can_ be a logical grouping of xxx_v<> values, but it appears
+//         that all of the terms are evaluated, regardless of order, making
+//         some combinations fail before the SFINAE can kick in.
+//         std::conjunction_v<> and std::disjunction_v<> seem to use lazy
+//         evaluation, so use of them is often necessary
 #define fmtster_MAKEIS(ID, COND)                                               \
 template<typename T, typename = void>                                          \
 struct is_ ## ID                                                               \
@@ -212,7 +288,6 @@ struct is_tuple<std::tuple<Ts...> >
 template<typename... Ts>
 inline constexpr bool is_tuple_v = is_tuple<Ts...>::value;
 
-// tools for use below
 fmtster_MAKEIS(fmtsterable,
                (std::is_base_of_v<fmtster::Base, fmt::formatter<simplify_type<T> > >));
 fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
@@ -220,98 +295,30 @@ fmtster_MAKEIS(braceable, (disjunction_v<is_mappish<T>,
                                          is_pair<T>,
                                          is_tuple<T> >));
 
-} // namespace internal
-
 //
-// enumeration for use in JSONStyle below
+// Used to measure the sizes of the bitfield-based XXXStyle structures to
+// determine the size of the large (unsigned) integer necessary to use when
+// the unions are declared
 //
-enum JSS
-{
-    BLANK               = 0x0,
-    reserved_1          = 0x1,
-    SPACE               = 0x2,
-    SPACEx2             = 0x3,
-    reserved_4          = 0x4,
-    reserved_5          = 0x5,
-    TAB                 = 0x6,
-    TABx2               = 0x7,
-    NEWLINE             = 0x8,
-    reserved_9          = 0x9,
-    NEWLINE_SPACE       = 0xA,
-    NEWLINE_SPACEx2     = 0xB,
-    reserved_C          = 0xC,
-    reserved_D          = 0xD,
-    NEWLINE_TAB         = 0xE,
-    NEWLINE_TABx2       = 0xF
-}; // enum JSS
-
-//
-// definition of style, reused multiple times below
-//
-#if false // @@@ disable members that are not implemented
-
-#define JSONSTYLESTRUCT                                                        \
-    {                                                                          \
-        /* note that these two booleans can never both be false, so they */    \
-        /* double as a method of differentiating a default-meaning 0 from */   \
-        /* an actual configuration setting */                                  \
-        bool cr : 1;                                                           \
-        bool lf : 1;                                                           \
-                                                                               \
-        bool hardTab : 1;                                                      \
-        unsigned int tabCount : 4;                                             \
-                                                                               \
-        /* [ <gap A> value, <gap B> value <gap C> ] */                         \
-        unsigned int gapA : 4;                                                 \
-        unsigned int gapB : 4;                                                 \
-        unsigned int gapC : 4;                                                 \
-                                                                               \
-        /* { <gap 1> "string" <gap 2> : <gap 3> value, <gap 4> "string" <gap 5> : <gap 6> value <gap 7> } */ \
-        unsigned int gap1 : 4;                                                 \
-        unsigned int gap2 : 4;                                                 \
-        unsigned int gap3 : 4;                                                 \
-        unsigned int gap4 : 4;                                                 \
-        unsigned int gap5 : 4;                                                 \
-        unsigned int gap6 : 4;                                                 \
-        unsigned int gap7 : 4;                                                 \
-                                                                               \
-        unsigned int emptyArray : 2;                                           \
-        unsigned int emptyObject : 2;                                          \
-        unsigned int sva : 2;                                                  \
-        unsigned int svo : 2;                                                  \
-    }
-
-#else
-
-// @@@ all that is implemented currently
-#define JSONSTYLESTRUCT                                                        \
-    {                                                                          \
-        bool hardTab : 1;                                                      \
-        unsigned int tabCount : 4;                                             \
-    }
-
-#endif // true
-
-namespace internal
-{
-
-// used to measure the size of the bitfield-based structures
 struct MeasureJSONStyle JSONSTYLESTRUCT;
 
 // If well packed, each style structure will fit into 64 bits, but if not, we
-// can use 128 bits.
+// can use 128 bits. NOTE: VALUE_T is meant to be the maximum size necessary
+// to be used for all XXXStyle unions.
 template<size_t bytes>
-using VALUE_TYPE =
+using VALUE_T_SELECTOR =
     std::conditional_t<(bytes <= 8),
                        uint64_t,
-                       std::conditional_t<(bytes > 8) && (bytes <= 16),
+                       std::conditional_t<((bytes > 8) && (bytes <= 16)),
                                           __uint128_t,
                                           void>
                       >;
-using VALUE_T = VALUE_TYPE<sizeof(MeasureJSONStyle)>;
+using VALUE_T = VALUE_T_SELECTOR<sizeof(MeasureJSONStyle)>;
 
-// used to define the DEFAULTJSONCONFIG before use as default value (format
-// must match the bitfield packing, so no hard-wired constant can be used)
+//
+// Used to define the DEFAULTxxxCONFIG instances before their use as default
+// values in the XXXStyle constructors
+//
 union ForwardJSONStyle
 {
     struct JSONSTYLESTRUCT;
@@ -320,7 +327,10 @@ union ForwardJSONStyle
 
 } // namespace internal
 
-// built-in default, which can be replaced by user-configured default
+//
+// Built-in defaults, which can be replaced by user-configured defaults
+// for each format
+//
 constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
 {
     {
@@ -366,8 +376,15 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
     }
 };
 
-// a union to allow access to individual style members as well as treat as
-// integer for use with {fmt}
+//
+// {fmt} does not currently allow custom types to be passed as a nested
+// argument. The workaround is to define the XXXStyle objects as unions
+// with the large (unsigned) integer (size calculated above). This also
+// requires another argument to specify which of the XXXStyle objects was
+// passed.
+// These are defined as unions between the large (unsigned) integer and
+// anonymous structures to allow the user to directly access to individual
+// style members.
 union JSONStyle
 {
 public:
@@ -375,19 +392,16 @@ public:
     internal::VALUE_T value;
 
     JSONStyle(internal::VALUE_T val = DEFAULTJSONCONFIG.value)
-      : value(val)
+      : value(val ? val : DEFAULTJSONCONFIG.value)
     {}
-
-    operator internal::VALUE_T() const
-    {
-        return value;
-    }
 };
 
 namespace internal
 {
 
-// base class used by all serialization format style helpers
+//
+// Base struct used by all serialization format style helpers
+//
 struct StyleHelper
 {
     union
@@ -397,12 +411,21 @@ struct StyleHelper
         // XMLStyle xmlStyle;      // never actually references
     } mStyle;
 
-    string tab;  // expanded tab
+    //
+    // Common expanded strings
+    //
+    string tab;
 
-    StyleHelper(VALUE_T val)
-      : mStyle{val}
+    StyleHelper(VALUE_T value)
+      : mStyle{value}
     {}
 
+    // Needed to enable polymorphism
+    virtual ~StyleHelper() = default;
+
+    //
+    // Functions to convert string types to a desired numeric type
+    //
     template<typename T>
     T toValue(const char* sz, const string& throwArg = "")
     {
@@ -423,8 +446,8 @@ struct StyleHelper
                     else
                     {
                         throw fmt::format_error(F("fmtster: unsupported {} argument: \"{}\"",
-                                                throwArg,
-                                                sz));
+                                                  throwArg,
+                                                  sz));
                     }
                 }
                 val = (val * 10) + (c - '0');
@@ -439,6 +462,9 @@ struct StyleHelper
         return toValue<T>(str.c_str());
     }
 
+    //
+    // Functions to convert input types to a format index
+    //
     int formatToValue(__int128_t i)
     {
         if (i != 0)
@@ -482,21 +508,24 @@ struct StyleHelper
     }
 }; // StyleHelper
 
-// wrapper of JSONStyle that expands configuration to strings used in output
+//
+// Behind-the-scenes workhorse based on JSONStyle
+//
+
 class JSONStyleHelper
   : public StyleHelper
 {
     VALUE_T mLastStyleValue;
 
 public:
-    JSONStyleHelper(uint64_t value = DEFAULTJSONCONFIG.value)
+    JSONStyleHelper(VALUE_T value = DEFAULTJSONCONFIG.value)
       : StyleHelper(value ? value : DEFAULTJSONCONFIG.value),
         mLastStyleValue(0)
     {
         updateExpansions();
     }
 
-    JSONStyleHelper operator=(uint64_t value)
+    JSONStyleHelper operator=(VALUE_T value)
     {
         mStyle.value = value;
         updateExpansions();
@@ -510,7 +539,10 @@ public:
         return *this;
     }
 
-    // Dummy escape function for all but strings
+    //
+    // Functions used to escape string the JSON way (or just return the value
+    // if any other type)--Design needed to keep compiler happy below
+    //
     template<typename T>
     T escapeIfString(const T& val)
     {
@@ -563,42 +595,46 @@ public:
             mLastStyleValue = mStyle.value;
         }
     }
-};
+}; // class JSONStyleHelper
 
 } // namespace internal
 
-// base class that handles formatting
+//
+// Main fmtster::Base class that handles fmtster formatting including parsing
+// the arguments (nested or not) and helper functions to resolve them
+//
 struct Base
 {
 protected:
+    // Order of the fmster arguments
     static constexpr size_t INDENT_ARG_INDEX = 0;
     static constexpr size_t PER_CALL_ARG_INDEX = 1;
     static constexpr size_t STYLE_ARG_INDEX = 2;
     static constexpr size_t FORMAT_ARG_INDEX = 3;
 
-    // results of parsing for use in format()
+    // Results of parse() for use in format()
     vector<string> mArgData;
     vector<unsigned int> mNestedArgIndex;
 
-    // from format arg (int due to code in formatToValue(const char*))
+    // From format arg (int due to code in formatToValue(const char*))
     int mFormatSetting;
 
-    // from style arg
+    // From style arg
     std::unique_ptr<internal::StyleHelper> mpStyleHelper;
     std::reference_wrapper<internal::VALUE_T> mStyleValue;
 
-    // from indent
-    size_t mIndentSetting;
-
-    // from per call parms
+    //
+    // From per call parms arg
+    //
     bool mDisableBras;
 
-    string mBraIndent;  // expanded brace/bracket indent
-    string mDataIndent; // expanded data indent
+    // From indent arg
+    size_t mIndentSetting;
 
-    //
-    // header-defined static variables to hold user-define defaults
-    //
+    // Expanded indent strings
+    string mBraIndent;  // brace/bracket indent
+    string mDataIndent; // data indent
+
     static int& DefaultFormat()
     {
         static int defaultFormat = 0;
@@ -611,6 +647,8 @@ protected:
         return defaultStyleHelper;
     };
 
+    // Function to pass along string to specified format type helper for
+    // escaping
     template<typename T>
     T escapeIfString(int format, const T& val)
     {
@@ -620,7 +658,7 @@ protected:
             return dynamic_cast<internal::JSONStyleHelper*>(mpStyleHelper.get())->escapeIfString(val);
 
         default:
-            throw fmt::format_error("fmtster: Shouldn't get here, because unsupported format should have already been thrown");
+            throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
         }
     }
 
@@ -642,24 +680,13 @@ public:
       : mArgData{ "" },
         mNestedArgIndex{ 0 },
         mFormatSetting(GetDefaultFormat()),
-        mpStyleHelper(new internal::JSONStyleHelper(GetDefaultJSONStyle())), // helper for default format
+        mpStyleHelper(new internal::JSONStyleHelper(GetDefaultJSONStyle().value)), // helper for default format
         mStyleValue(mpStyleHelper->mStyle.value),
         mIndentSetting(0),
         mDisableBras(false)
     {}
 
-    // Parses the format in the format {<format>,<style>,<tab>,<indent>}.
-    // > format (default is 0: JSON):
-    //     0 = JSON
-    // >     style (default is 0):
-    //         0 = open brace/bracket on same line as key, each property on new line
-    //         1 = same as 0 with no open/close braces/brackets
-    // > tab (default is 2 spaces):
-    //     positive integers: spaces
-    //     0: no tab
-    //     negative integers: hard tabs
-    // > indent (default is 0):
-    //     positive integers: number of <tab>s to start the indent
+    // Parses the format in the format {<indent>,<per-call-parms>,<style>,<format>}
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
@@ -791,7 +818,7 @@ public:
         }
         else if(!mArgData[STYLE_ARG_INDEX].empty())
         {
-            auto styleSetting = mpStyleHelper->toValue<uint64_t>(mArgData[STYLE_ARG_INDEX]);
+            auto styleSetting = mpStyleHelper->toValue<VALUE_T>(mArgData[STYLE_ARG_INDEX]);
         }
 
         switch (mFormatSetting)
@@ -913,7 +940,7 @@ public:
                         break;
 
                     default:
-                        throw fmt::format_error("fmtster (pcp): Shouldn't get here, because unsupported format should have already been thrown");
+                        throw fmt::format_error(F("fmtster: Shouldn't get here ({}), because unsupported format should have already been thrown", __LINE__));
                     }
                 }
                 break;
@@ -923,13 +950,18 @@ public:
             }
 
             negate = (c == '-');
-        }
+
+        } /// for(const auto c : pcpSetting)
+
     } // resolveArgs()
+
 }; // struct FmtterBase
 
 } // namespace fmtster
 
-// fmt::formatter<> used for all containers
+//
+// fmt::formatter<> used for all containers (not adapters)
+//
 template<typename T, typename Char>
 struct fmt::formatter<T,
                       Char,
@@ -939,10 +971,12 @@ struct fmt::formatter<T,
     template<typename FormatContext>
     using FCIt_t = decltype(std::declval<FormatContext>().out());
 
-    // templated function inner loop function for ALL CONTAINERS EXCEPT
-    // MULTIMAPS (this can be used for single data per element & map-like
-    // containers because map-like containers use a std::pair<> for each
-    // element)
+    //
+    // Templated function inner loop for ALL CONTAINERS EXCEPT MULTIMAPS
+    // (This is able to be used for single data per element & map-like
+    // containers, because map-like containers use a std::pair<> for each
+    // element.)
+    //
     template<typename FormatContext, typename C = T>
     std::enable_if_t<std::negation_v<fmtster::internal::is_multimappish<C> > >
         format_loop(const C& c, FCIt_t<FormatContext>& itFC)
@@ -1003,7 +1037,9 @@ struct fmt::formatter<T,
         }
     } // format_loop() (all containers except multimap)
 
-    // templated function inner loop function for multimaps
+    //
+    // Templated function inner loop for MULTIMAPS
+    //
     template<typename FormatContext, typename C = T>
     std::enable_if_t<fmtster::internal::is_multimappish_v<C> >
         format_loop(const C& c, FCIt_t<FormatContext>& itFC)
@@ -1053,6 +1089,9 @@ struct fmt::formatter<T,
         }
     } // format_loop() (multimaps)
 
+    //
+    // format()
+    //
     template<typename FormatContext>
     auto format(const T& sc, FormatContext& ctx)
     {
@@ -1090,10 +1129,13 @@ struct fmt::formatter<T,
         }
 
         return itFC;
-    }
+    } // format()
+
 }; // struct fmt::formatter< containers >
 
-// fmt::formatter<> for adapters (wraps containers & removes some functions)
+//
+// fmt::formatter<> for adapters
+//
 template<typename A, typename Char>
 struct fmt::formatter<A,
                       Char,
@@ -1131,7 +1173,9 @@ struct fmt::formatter<A,
     }
 }; // struct fmt::formatter< adapters >
 
+//
 // fmt::formatter<> for std::pair<>
+//
 template<typename T1, typename T2>
 struct fmt::formatter<std::pair<T1, T2> >
   : fmtster::Base
@@ -1195,8 +1239,10 @@ struct fmt::formatter<std::pair<T1, T2> >
     }
 }; // struct fmt::formatter<std::pair<> >
 
+//
 // fmt::formatter<> for std::tuple<> (wraps group of heterogeneous objects
 // known at compile time)
+//
 template<typename... Ts>
 struct fmt::formatter<std::tuple<Ts...> >
   : fmtster::Base
@@ -1278,7 +1324,9 @@ struct fmt::formatter<std::tuple<Ts...> >
     }
 }; // struct fmt::formatter<std::tuple<> >
 
-// fmt::formatter<> for fmtster::JSONStyle
+//
+// fmt::formatter<> for dumping fmtster::JSONStyle
+//
 template<>
 struct fmt::formatter<fmtster::JSONStyle>
     : fmtster::Base
@@ -1294,6 +1342,7 @@ struct fmt::formatter<fmtster::JSONStyle>
         auto itFC = ctx.out();
 
         const auto tup = std::make_tuple(
+            make_pair("value"s, style.value),
 #if false // @@@ disable members that are not implemented
             make_pair("cr"s, style.cr),
             make_pair("lf"s, style.lf),

@@ -563,6 +563,7 @@ std::string ReplaceString(std::string subject,
 // initial default style
 static string gRef =
     "{\n"
+    "  \"value\" : 4,\n"
 #if false // @@@ disable members that are not implemented
     "  \"cr\" : false,\n"
     "  \"lf\" : true,\n"
@@ -611,6 +612,7 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDump)
     style.hardTab = true;
     style.tabCount = 1;
     // change reference string to change values (style still default)
+    gRef = ReplaceString(gRef, "\"value\" : 4", "\"value\" : 3");
     gRef = ReplaceString(gRef, "\"hardTab\" : false", "\"hardTab\" : true");
     gRef = ReplaceString(gRef, "\"tabCount\" : 2", "\"tabCount\" : 1");
     auto str = F("{}", style);
