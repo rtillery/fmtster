@@ -20,7 +20,7 @@
 
 CXX=g++
 LD=ld
-CFLAGS=-std=c++17
+CFLAGS=-std=c++17 -g
 LFLAGS=
 LIBS=-lpthread -lfmt
 TESTLIBS=-lgtest -lgtest_main
@@ -31,12 +31,12 @@ fmtstertest.o: fmtstertest.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 fmtstertest: fmtstertest.o
-	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS) $(TESTLIBS)
-	strip $@
+	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(TESTLIBS) $(LIBS)
+#	strip $@
 
 example-json.o: example-json.cpp fmtster.h Makefile
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 example-json: example-json.o
 	$(CXX) $(CFLAGS) $^ -o $@ $(LFLAGS) $(LIBS)
-	strip $@
+#	strip $@

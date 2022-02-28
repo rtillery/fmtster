@@ -1,4 +1,21 @@
 # **`fmtster` Change List**
+## **0.5.0**
+* Reordered arguments to help minimize empty arguments (see README.md), and in
+  anticipation of a future change which might eliminate the need for the fourth
+  argument
+* Implemented support for multiple ways of specializing format (fourth argument:
+  0, j..., J... (where ... is zero or more chars)); initial default format is
+  JSON
+* Implemented support for `fmtster::JSONStyle` object (third argument);
+  initial (struct) default style is specified by default values in
+  `fmtster::JSONStyle`
+  ### **NOTE: that this structure must be passed by using the `value` member**
+* Moved the tab specifier into `fmtster::JSONStyle`
+* Repurposed second argument to allow specific per-call options using characters
+  to enable each option.
+## **0.4.0**
+### **NOTE:** 0.4.x was skipped to emphasize how large the change between 0.3.0 and 0.5.0 was :-)
+
 ## **0.3.0**
 * Fixed issues with `std::pair<>`
 * Added support for `std::tuple<>` (currently only meant to hold `std::pair<>`s

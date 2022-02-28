@@ -34,6 +34,7 @@ using std::stringstream;
 using std::string;
 using namespace std::string_literals;
 #include <tuple>
+using std::tuple;
 #include <utility>
 #include <variant>
 using std::variant;
@@ -56,7 +57,7 @@ constexpr auto mt(Ts... es)
     return std::make_tuple(es...);
 }
 
-struct Person
+struct Person1
 {
     string name;
     ex_time_point_t birthdate;
@@ -65,57 +66,135 @@ struct Person
     map<string, string> family;
 };
 
-
+struct Person2
+{
+    string name;
+    ex_time_point_t birthdate;
+    float salary;
+    vector<string> phones;
+    map<string, string> family;
+};
 
 template<>
-struct fmt::formatter<Person> : fmtster::FmtsterBase
+struct fmt::formatter<Person1>
+  : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const Person& p, FormatContext& ctx)
+    auto format(const Person1& p, FormatContext& ctx)
     {
-        // this could use the tuple approach shown for the opt example in
-        //  main(), but this to illustrates use of the fmt::format_to() call
-        //  and care that needs to be taken with JSON commas
+        // direct approach (take special care with commas and carriage returns!)
 
-        auto itOut = (mStyleSetting & 1) ?
-                     ctx.out() :
-                     fmt::format_to(ctx.out(), "{{\n");
+        resolveArgs(ctx);
 
-        const string FMTSTR_NOCOMMA = F("{{:{},{},{},{}}}",
-                                        mFormatSetting,
-                                        mStyleSetting | 1,
-                                        mTabSetting,
-                                        mDataIndentSetting);
-        const string FMTSTR = FMTSTR_NOCOMMA + ",\n";
-        itOut = format_to(itOut, FMTSTR, mp("name"s, p.name));
+        auto itFC = ctx.out();
+
+        const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+
+        // output opening brace (if enabled)
+        if (!mDisableBras)
+        {
+            itFC = format_to(itFC, "{{\n");
+            mIndentSetting++;
+        }
+
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},\n",
+                         mp("name"s, p.name),
+                         mIndentSetting,
+                         "-b",
+                         mStyleValue,
+                         mFormatSetting);
 
         // @@@ TODO: Wrap this section for use with C++20
         stringstream ss;
         auto t = ex_clock_t::to_time_t(p.birthdate);
         auto tm = *std::localtime(&t);
         ss << std::put_time(&tm, "%x");
-        itOut = format_to(itOut, FMTSTR, mp("birthdate"s, ss.str()));
 
-        itOut = format_to(itOut, FMTSTR, mp("salary"s, p.salary));
-        itOut = format_to(itOut, FMTSTR, mp("phones"s, p.phones));
-        itOut = format_to(itOut, FMTSTR_NOCOMMA, mp("family"s, p.family));
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},\n",
+                         mp("birthdate"s, ss.str()),
+                         mIndentSetting,
+                         "-b",
+                         mStyleValue,
+                         mFormatSetting);
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},\n",
+                         mp("salary"s, p.salary),
+                         mIndentSetting,
+                         "-b",
+                         mStyleValue,
+                         mFormatSetting);
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}},\n",
+                         mp("phones"s, p.phones),
+                         mIndentSetting,
+                         "-b",
+                         mStyleValue,
+                         mFormatSetting);
 
-        if (!(mStyleSetting & 1))
-            itOut = fmt::format_to(itOut, "\n}}");
+        // Note this entry's format string does not end a comma
+        itFC = format_to(itFC,
+                         "{:{},{},{},{}}",
+                         mp("family"s, p.family),
+                         mIndentSetting,
+                         "-b",
+                         mStyleValue,
+                         mFormatSetting);
 
-        return itOut;
+        if (!mDisableBras)
+            itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
+
+        return itFC;
     }
 };
 
-using Personnel = vector<Person>;
-
-Personnel GetPersonnel()
+template<>
+struct fmt::formatter<Person2>
+  : fmtster::Base
 {
+    template<typename FormatContext>
+    auto format(const Person2& p, FormatContext& ctx)
+    {
+        // tuple approach
+
+        resolveArgs(ctx);
+
+        // @@@ TODO: Wrap this section for use with C++20
+        stringstream ss;
+        auto t = ex_clock_t::to_time_t(p.birthdate);
+        auto tm = *std::localtime(&t);
+        ss << std::put_time(&tm, "%x");
+
+        auto tup = mt(
+            mp("name"s, p.name),
+            mp("birthdate"s, ss.str()),
+            mp("salary"s, p.salary),
+            mp("phones"s, p.phones),
+            mp("family"s, p.family)
+        );
+        return format_to(ctx.out(),
+                         "{:{},{},{},{}}",
+                         tup,
+                         mIndentSetting,
+                         mDisableBras ? "-b" : "",
+                         mStyleValue,
+                         mFormatSetting);
+    }
+};
+
+using Personnel1 = vector<Person1>;
+using Personnel2 = vector<Person2>;
+
+template<typename T>
+T GetPersonnel()
+{
+    // birthdates
     static std::tm tm1{ 0, 0, 0,
                         1, 1 - 1, 1970 - 1900 };
     static std::tm tm2{ 0, 0, 0,
                         31, 12 - 1, 1980 - 1900 };
-    return Personnel
+    return T
     {
         {
             .name = "John Doe",
@@ -136,9 +215,39 @@ Personnel GetPersonnel()
                         { "brother", "Jake Doe" },
                         { "father", "James Doe" } }
         }
-
     };
 }
+
+struct Color
+{
+    string hue; // color family
+    vector<tuple<string, float> > primaries;
+};
+
+template<>
+struct fmt::formatter<Color>
+  : fmtster::Base
+{
+    template<typename FormatContext>
+    auto format(const Color& color, FormatContext& ctx)
+    {
+        using std::make_pair;
+
+        resolveArgs(ctx);
+
+        auto tup = std::make_tuple(
+            make_pair("hue"s, color.hue),
+            make_pair("primaries"s, color.primaries)
+        );
+        return format_to(ctx.out(),
+                         "{:{},{},{},{}}",
+                         tup,
+                         mIndentSetting,
+                         mDisableBras ? "-b" : "",
+                         mStyleValue,
+                         mFormatSetting);
+    }
+};
 
 int main()
 {
@@ -165,9 +274,83 @@ int main()
     cout << "\n\n" << endl;
 
 
-    string buildAJSON = "{\n";
-
+    // vector of Person1, where Person1 has a specialized fmt::formatter<>
+    // based on fmtster
     size_t personNumber = 0;
-    for (auto person : GetPersonnel())
-        cout << F("{}:\n{:,1,,1}\n", personNumber++, person) << endl;
+    for (auto person : GetPersonnel<Personnel1>())
+        cout << F("{} : {}\n", personNumber++, person) << endl;
+
+    cout << "\n\n" << endl;
+
+    // vector of Person2, where Person2 has a specialized fmt::formatter<>
+    // based on fmtster
+    personNumber = 0;
+    for (auto person : GetPersonnel<Personnel2>())
+        cout << F("{} : {}\n", personNumber++, person) << endl;
+
+    cout << "\n\n" << endl;
+
+    // map of string to Color, where Color has a specialized fmt::formatter<>
+    // based on fmtster
+    map<string, Color> colors
+    {
+        {
+            "Burgundy",
+            {
+                "red",
+                {
+                    { "red", 1.0 }
+                }
+            }
+        },
+        {
+            "Gray",
+            {
+                "none",
+                {
+                    { "red", 1.0/3.0 },
+                    { "blue", 1.0/3.0 },
+                    { "yellow", 1.0/3.0 }
+                }
+            }
+        }
+    };
+
+    // make 4-space tab the default for JSON
+    fmtster::JSONStyle style;
+    style.tabCount = 4;
+    F("{:,s,{},j}", mt(), style.value);
+
+    // print list of customized colors using specialized template above
+    cout << F("Colors: {}", colors) << endl;
+
+    // restore original default style for JSON
+    F("{:,s,{},j}", mt(), fmtster::JSONStyle{}.value);
+
+    cout << "\n\n" << endl;
+
+    // example of combining simple container/struct/class container contents
+    // into the same JSON object
+
+    // output opening bracket for re-arranged list of colors
+    cout << "Colors: [\n";
+    size_t count = colors.size();
+    for (auto pr : colors)
+    {
+        // pr is a std::pair<string, vector<tuple<string, float> > >
+
+        // manual use of a brace requires manual addition of the tab
+        cout << "  {\n";
+
+        // "-b" disables braces around the objects
+        // 2 initial indents: 1 for the brace (above) + 1 more for the data inside
+        cout << F("{:2,-b},\n", mp("name"s, std::get<0>(pr)));
+        cout << F("{:2,-b}\n", std::get<1>(pr));
+
+        // care must be taken to properly handle JSON commas
+        cout << (--count ? "  },\n" : "  }\n");
+    }
+
+    // output closing bracket
+    cout << "]" << endl;
 }
