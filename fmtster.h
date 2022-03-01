@@ -588,6 +588,7 @@ public:
     {
         if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
         {
+cout << __func__ << "(): expanding" << endl;
             const JSONStyle style(mStyle.value);
             tab = style.hardTab
                   ? string(style.tabCount, '\t')

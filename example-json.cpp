@@ -284,7 +284,7 @@ map<string, bool> boolmap =
 string str;
 {
     BENCHMARK;
-    for (int i = 100000; i; --i)
+    for (int i = 10 /* 0000 */; i; --i)
         str = F("{}", boolmap);
 }
 
@@ -293,7 +293,7 @@ fmtster::JSONStyle eightCharStyle;
 eightCharStyle.tabCount = 8;
 {
     BENCHMARK;
-    for (int i = 100000; i; --i)
+    for (int i = 10 /* 0000 */; i; --i)
     {
         str = F("{:,,{},json}", boolmap, eightCharStyle.value);
         str = F("{:,,{},json}", boolmap, initialStyle.value);
