@@ -22,6 +22,9 @@
 #include <chrono>
 using ex_clock_t = std::chrono::system_clock;
 using ex_time_point_t = std::chrono::time_point<ex_clock_t>;
+using std::chrono::time_point;
+using std::chrono::high_resolution_clock;
+using std::chrono::nanoseconds;
 #include <iomanip>
 #include <iostream>
 using std::cout;
@@ -249,8 +252,55 @@ struct fmt::formatter<Color>
     }
 };
 
+class Benchmark
+{
+    const high_resolution_clock::time_point mStart;
+    const string mFn;
+
+public:
+    Benchmark(const string& fn) :
+        mStart(high_resolution_clock::now()),
+        mFn(fn)
+    {}
+    ~Benchmark()
+    {
+        const auto dur = high_resolution_clock::now() - mStart;
+        const double dbl = (double)dur.count() / 1000000000;
+        cout << F(">>>>>>>> {:0.9f} secs: {}() <<<<<<<<", dbl, mFn) << endl;
+    }
+};
+
+// #define BENCHMARK
+#define BENCHMARK Benchmark bench(__func__)
+
 int main()
 {
+
+{
+map<string, bool> boolmap =
+{
+    { "true", true }, { "false", false }, { "maybe", false }
+};
+string str;
+{
+    BENCHMARK;
+    for (int i = 100000; i; --i)
+        str = F("{}", boolmap);
+}
+
+fmtster::JSONStyle initialStyle;
+fmtster::JSONStyle eightCharStyle;
+eightCharStyle.tabCount = 8;
+{
+    BENCHMARK;
+    for (int i = 100000; i; --i)
+    {
+        str = F("{:,,{},json}", boolmap, eightCharStyle.value);
+        str = F("{:,,{},json}", boolmap, initialStyle.value);
+    }
+}
+
+}
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
     auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
