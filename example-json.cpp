@@ -278,6 +278,12 @@ int main()
     auto glossary = mt(mp("title"s, "example glossary"s),
                        mp("GlossDiv"s, GlossDiv));
     auto obj = mt(mp("glossary"s, glossary));
+{
+fmtster::JSONStyle style;
+style.hardTab = true;
+style.tabCount = 2;
+cout << F("---\n{:,,{}}\n---", obj, style) << endl;
+}
     cout << F("{}", obj) << endl;
 
 

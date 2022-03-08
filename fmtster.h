@@ -316,7 +316,7 @@ using VALUE_T_SELECTOR =
                                           __uint128_t,
                                           void>
                       >;
-using VALUE_T = VALUE_T_SELECTOR<16 /* sizeof(MeasureJSONStyle) */>;
+using VALUE_T = VALUE_T_SELECTOR<sizeof(MeasureJSONStyle)>;
 
 //
 // Used to define the DEFAULTxxxCONFIG instances before their use as default
@@ -805,9 +805,24 @@ protected:
                     {
                         return value;
                     }
+                    else if constexpr (std::is_same_v<decltype(value), typename fmt::basic_format_arg<FormatContext>::handle>)
+                    {
+                        const std::type_index JSONStyle_TI = std::type_index(typeid(JSONStyle));
+// cout << "JSONStyle_TI: " << JSONStyle_TI.hash_code() << endl;
+// cout << "value.custom_.ti: " << value.custom_.ti.hash_code() << endl;
+                        if (value.custom_.ti == JSONStyle_TI)
+                        {
+                            return ((JSONStyle*)(value.custom_.value))->value;
+                        }
+                        else
+                        {
+                            throw fmt::format_error(F("(2) fmtster: unsupported nested argument type for style: {} (only integers accepted--pass XXXStyle.value, not XXXStyle)",
+                                                    typeid(value).name()));
+                        }
+                    }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for style: {} (only integers accepted--pass XXXStyle.value, not XXXStyle)",
+                        throw fmt::format_error(F("(1) fmtster: unsupported nested argument type for style: {} (only integers accepted--pass XXXStyle.value, not XXXStyle)",
                                                   typeid(value).name()));
                     }
                 },
