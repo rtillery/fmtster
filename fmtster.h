@@ -399,7 +399,68 @@ public:
 namespace internal
 {
 
-//
+template<typename T>
+struct hash
+{
+    size_t operator()(const T& val) const
+    {
+        return std::hash<T>{}(val);
+    }
+};
+
+template<>
+struct hash<__uint128_t>
+{
+    uint64_t hash_combine(uint64_t highhash, uint64_t lowhash) const
+    {
+        return highhash +
+               0x9e3779b97f4a7c15U +
+               (lowhash << 12) +
+               (lowhash >> 4);
+    }
+    uint32_t hash_combine(uint32_t highhash, uint32_t lowhash) const
+    {
+        return highhash +
+               0x937779b9U +
+               (lowhash << 6) +
+               (lowhash >> 2);
+    }
+    size_t operator()(__uint128_t val) const
+    {
+        constexpr auto bytes = sizeof(size_t);
+        if (bytes == 8)
+        {
+            constexpr uint64_t mask = (uint64_t)(-1);
+            const uint64_t high = (uint64_t)(val >> 64);
+            const uint64_t low = (uint64_t)(val & mask);
+            constexpr hash<uint64_t> hash64;
+            const uint64_t highhash = hash64(high);
+            const uint64_t lowhash = hash64(low);
+            return hash_combine(highhash, lowhash);
+        }
+        else if (bytes == 4)
+        {
+            constexpr uint32_t mask = (uint32_t)(-1);
+            const uint32_t highhigh = (uint32_t)(val >> 96);
+            const uint32_t highlow = (uint32_t)((val >> 64) & mask);
+            const uint32_t lowhigh = (uint32_t)((val >> 32) & mask);
+            const uint32_t lowlow = (uint32_t)(val & mask);
+            constexpr hash<uint32_t> hash32;
+            const uint32_t highhighhash = hash32(highhigh);
+            const uint32_t highlowhash = hash32(highlow);
+            const uint32_t lowhighhash = hash32(lowhigh);
+            const uint32_t lowlowhash = hash32(lowlow);
+            return hash_combine(hash_combine(highhighhash, highlowhash),
+                                hash_combine(lowhighhash, lowlowhash));
+        }
+        else
+        {
+            throw fmt::format_error(F("fmtster: unsupported size_t size ({}), only 64 & 128 bits supported",
+                                      sizeof(size_t)));
+        }
+    }
+};
+
 // Base struct used by all serialization format style helpers
 //
 struct StyleHelper
