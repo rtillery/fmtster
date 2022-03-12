@@ -1,4 +1,8 @@
 # **`fmtster` Change List**
+## **0.5.1**
+* Added support for system-specific newlines (can be overridden by user in
+  `fmtster::XXXStyle` structure)
+* Fixed some exception messages which were missing type information
 ## **0.5.0**
 * Reordered arguments to help minimize empty arguments (see README.md), and in
   anticipation of a future change which might eliminate the need for the fourth
