@@ -22,6 +22,9 @@
 #include <chrono>
 using ex_clock_t = std::chrono::system_clock;
 using ex_time_point_t = std::chrono::time_point<ex_clock_t>;
+using std::chrono::time_point;
+using std::chrono::high_resolution_clock;
+using std::chrono::nanoseconds;
 #include <iomanip>
 #include <iostream>
 using std::cout;
@@ -99,7 +102,7 @@ struct fmt::formatter<Person1>
 
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
-                         mp("name"s, p.name),
+                         mp("name", p.name),
                          mIndentSetting,
                          "-b",
                          mStyleValue,
@@ -113,21 +116,21 @@ struct fmt::formatter<Person1>
 
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
-                         mp("birthdate"s, ss.str()),
+                         mp("birthdate", ss.str()),
                          mIndentSetting,
                          "-b",
                          mStyleValue,
                          mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
-                         mp("salary"s, p.salary),
+                         mp("salary", p.salary),
                          mIndentSetting,
                          "-b",
                          mStyleValue,
                          mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
-                         mp("phones"s, p.phones),
+                         mp("phones", p.phones),
                          mIndentSetting,
                          "-b",
                          mStyleValue,
@@ -136,7 +139,7 @@ struct fmt::formatter<Person1>
         // Note this entry's format string does not end a comma
         itFC = format_to(itFC,
                          "{:{},{},{},{}}",
-                         mp("family"s, p.family),
+                         mp("family", p.family),
                          mIndentSetting,
                          "-b",
                          mStyleValue,
@@ -167,11 +170,11 @@ struct fmt::formatter<Person2>
         ss << std::put_time(&tm, "%x");
 
         auto tup = mt(
-            mp("name"s, p.name),
-            mp("birthdate"s, ss.str()),
-            mp("salary"s, p.salary),
-            mp("phones"s, p.phones),
-            mp("family"s, p.family)
+            mp("name", p.name),
+            mp("birthdate", ss.str()),
+            mp("salary", p.salary),
+            mp("phones", p.phones),
+            mp("family", p.family)
         );
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
@@ -236,8 +239,8 @@ struct fmt::formatter<Color>
         resolveArgs(ctx);
 
         auto tup = std::make_tuple(
-            make_pair("hue"s, color.hue),
-            make_pair("primaries"s, color.primaries)
+            make_pair("hue", color.hue),
+            make_pair("primaries", color.primaries)
         );
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
@@ -249,30 +252,86 @@ struct fmt::formatter<Color>
     }
 };
 
+class Benchmark
+{
+    const high_resolution_clock::time_point mStart;
+    const string mFn;
+
+public:
+    Benchmark(const string& fn) :
+        mStart(high_resolution_clock::now()),
+        mFn(fn)
+    {}
+    ~Benchmark()
+    {
+        const auto dur = high_resolution_clock::now() - mStart;
+        const double dbl = (double)dur.count() / 1000000000;
+        cout << F(">>>>>>>> {:0.9f} secs: {}() <<<<<<<<", dbl, mFn) << endl;
+    }
+};
+
+// #define BENCHMARK
+#define BENCHMARK Benchmark bench(__func__)
+
 int main()
 {
+    // Benchmarks
+    map<string, bool> boolmap =
+    {
+        { "true", true }, { "false", false }, { "maybe", false }
+    };
+
+    string str;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+            str = F("{}", boolmap);
+    }
+
+    fmtster::JSONStyle initialStyle;
+    fmtster::JSONStyle eightCharStyle;
+    eightCharStyle.tabCount = 8;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+        {
+            str = F("{:,,{},json}", boolmap, eightCharStyle.value);
+            str = F("{:,,{},json}", boolmap, initialStyle.value);
+        }
+    }
+
+    fmtster::JSONStyle hardTabStyle;
+    hardTabStyle.hardTab = true;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+        {
+            str = F("{:,,{},json}", boolmap, eightCharStyle.value);
+            str = F("{:,,{},json}", boolmap, hardTabStyle.value);
+            str = F("{:,,{},json}", boolmap, initialStyle.value);
+        }
+    }
+
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
-    auto GlossDef = mt(mp("para"s, "A meta-markup language, used to create markup languages such as DocBook."s),
-                       mp("GlossSeeAlso"s, GlossSeeAlso));
-    auto GlossEntry = mt(mp("ID"s, "SGML"s),
-                         mp("SortAs"s, "SGML"s),
-                         mp("GlossTerm"s, "Standard Generalized Markup Language"s),
-                         mp("Acronym"s, "SGML"s),
-                         mp("Abbrev"s, "ISO 8879:1986"s),
-                         mp("GlossDef"s, GlossDef),
-                         mp("GlossSee"s, "markup"s));
-    auto GlossList = mp("GlossEntry"s, GlossEntry);
-    auto GlossDiv = mt(mp("title"s, "S"s),
-                       mp("GlossList"s, GlossList));
-    auto glossary = mt(mp("title"s, "example glossary"s),
-                       mp("GlossDiv"s, GlossDiv));
-    auto obj = mt(mp("glossary"s, glossary));
+    auto GlossDef = mt(mp("para", "A meta-markup language, used to create markup languages such as DocBook."),
+                       mp("GlossSeeAlso", GlossSeeAlso));
+    auto GlossEntry = mt(mp("ID", "SGML"),
+                         mp("SortAs", "SGML"),
+                         mp("GlossTerm", "Standard Generalized Markup Language"),
+                         mp("Acronym", "SGML"),
+                         mp("Abbrev", "ISO 8879:1986"),
+                         mp("GlossDef", GlossDef),
+                         mp("GlossSee", "markup"));
+    auto GlossList = mp("GlossEntry", GlossEntry);
+    auto GlossDiv = mt(mp("title", "S"),
+                       mp("GlossList", GlossList));
+    auto glossary = mt(mp("title", "example glossary"),
+                       mp("GlossDiv", GlossDiv));
+    auto obj = mt(mp("glossary", glossary));
     cout << F("{}", obj) << endl;
 
-
     cout << "\n\n" << endl;
-
 
     // vector of Person1, where Person1 has a specialized fmt::formatter<>
     // based on fmtster
@@ -344,7 +403,7 @@ int main()
 
         // "-b" disables braces around the objects
         // 2 initial indents: 1 for the brace (above) + 1 more for the data inside
-        cout << F("{:2,-b},\n", mp("name"s, std::get<0>(pr)));
+        cout << F("{:2,-b},\n", mp("name", std::get<0>(pr)));
         cout << F("{:2,-b}\n", std::get<1>(pr));
 
         // care must be taken to properly handle JSON commas

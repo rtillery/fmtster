@@ -452,9 +452,9 @@ enable_if_t<is_adapter_v<C>,
     auto data = DATA; \
     string str = F("{}", data); \
 cout << str << endl; \
-    auto gRef = GetReference(data); \
+    const auto REF = GetReference(data); \
 /* cout << ref << endl; */ \
-    EXPECT_EQ(gRef, str) << F("ref: {}\nstr: {}", gRef, str); \
+    EXPECT_EQ(REF, str) << F("ref: {}\nstr: {}", REF, str); \
 }
 
 #define ARRAYCONTAINERTEST(TYPE) \
@@ -560,49 +560,78 @@ std::string ReplaceString(std::string subject,
     return subject;
 }
 
-// initial default style
-static string gRef =
-    "{\n"
-    "  \"value\" : 4,\n"
-#if false // @@@ disable members that are not implemented
-    "  \"cr\" : false,\n"
-    "  \"lf\" : true,\n"
+string RefDump(const fmtster::JSONStyle& style, string tab = "style")
+{
+    if (tab == "style")
+        tab = style.hardTab
+              ? string(style.tabCount, '\t')
+              : string(style.tabCount, ' ');
+    return
+        F("{{\n"
+          "{}\"value\" : {},\n"
+          "{}\"cr\" : {},\n"
+          "{}\"lf\" : {},\n"
+          "{}\"hardTab\" : {},\n"
+          "{}\"tabCount\" : {}"
+                             "\n"
+#if false
+                             ",\n"
+          "{}\"gapA\" : {},\n"
+          "{}\"gapB\" : {},\n"
+          "{}\"gapC\" : {},\n"
+          "{}\"gap1\" : {},\n"
+          "{}\"gap2\" : {},\n"
+          "{}\"gap3\" : {},\n"
+          "{}\"gap4\" : {},\n"
+          "{}\"gap5\" : {},\n"
+          "{}\"gap6\" : {},\n"
+          "{}\"gap7\" : {},\n"
+          "{}\"emptyArray\" : {},\n"
+          "{}\"emptyObject\" : {},\n"
+          "{}\"singleLineArray\" : {},\n"
+          "{}\"singleLineObject\" : {}\n"
 #endif // false
-    "  \"hardTab\" : false,\n"
-    "  \"tabCount\" : 2"
-#if false // @@@ disable members that are not implemented
-                      ",\n"
-    "  \"gapA\" : 14,\n"
-    "  \"gapB\" : 2,\n"
-    "  \"gapC\" : 2,\n"
-    "  \"gap1\" : 14,\n"
-    "  \"gap2\" : 0,\n"
-    "  \"gap3\" : 2,\n"
-    "  \"gap4\" : 14,\n"
-    "  \"gap5\" : 0,\n"
-    "  \"gap6\" : 2,\n"
-    "  \"gap7\" : 8,\n"
-    "  \"emptyArray\" : 2,\n"
-    "  \"emptyObject\" : 2,\n"
-    "  \"sva\" : 1,\n"
-    "  \"svo\" : 1"
+          "}}",
+      tab, style.value,
+      tab, style.cr,
+      tab, style.lf,
+      tab, style.hardTab,
+      tab, style.tabCount
+#if false
+      ,
+      tab, style.gapA,
+      tab, style.gapB,
+      tab, style.gapC,
+      tab, style.gap1,
+      tab, style.gap2,
+      tab, style.gap3,
+      tab, style.gap4,
+      tab, style.gap5,
+      tab, style.gap6,
+      tab, style.gap7,
+      tab, style.emptyArray,
+      tab, style.emptyObject,
+      tab, style.singleLineArray,
+      tab, style.singleLineObject
 #endif // false
-                 "\n"
-    "}";
+      );
+}
 
 TEST_F(FmtsterTest, JSONStyle_StructDefaultDump)
 {
     fmtster::JSONStyle style;
     string str;
     str = F("{}", style);
-    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ninitial default JSONStyle: {}", gRef, str);
+    const auto REF = RefDump(style);
+    ASSERT_EQ(REF, str) << F("ref JSONStyle: {},\ninitial default JSONStyle: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_InitialDefaultDump)
 {
     // current default should match initial default
     auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
-    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+    const auto REF = RefDump(fmtster::Base::GetDefaultJSONStyle());
+    ASSERT_EQ(REF, str) << F("ref JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_HardTabDump)
@@ -611,12 +640,9 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDump)
     fmtster::JSONStyle style;
     style.hardTab = true;
     style.tabCount = 1;
-    // change reference string to change values (style still default)
-    gRef = ReplaceString(gRef, "\"value\" : 4", "\"value\" : 3");
-    gRef = ReplaceString(gRef, "\"hardTab\" : false", "\"hardTab\" : true");
-    gRef = ReplaceString(gRef, "\"tabCount\" : 2", "\"tabCount\" : 1");
     auto str = F("{}", style);
-    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+    const auto REF = RefDump(style, "  ");
+    ASSERT_EQ(REF, str) << F("ref JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_HardTabDump_HardTabStruct)
@@ -624,10 +650,9 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDump_HardTabStruct)
     fmtster::JSONStyle style;
     style.hardTab = true;
     style.tabCount = 1;
-    // change reference string to use hard tabs in style
-    gRef = ReplaceString(gRef, "  ", "\t");
     auto str = F("{:,,{},j}", style, style.value);
-    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+    const auto REF = RefDump(style);
+    ASSERT_EQ(REF, str) << F("ref JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_HardTabDefault)
@@ -644,14 +669,16 @@ TEST_F(FmtsterTest, JSONStyle_HardTabDefaultDump)
 {
     // serialize current default (with current default style) & compare to reference
     auto str = F("{}", fmtster::Base::GetDefaultJSONStyle());
-    ASSERT_EQ(gRef, str) << F("ref JSONStyle: {},\ncurrent default str: {}", gRef, str);
+    const auto REF = RefDump(fmtster::Base::GetDefaultJSONStyle());
+    ASSERT_EQ(REF, str) << F("ref JSONStyle: {},\ncurrent default str: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_RestoreDefaultToStructDefault)
 {
     // return current default to initial default for following tests
     auto str = F("{:,s,{},j}", make_tuple(), fmtster::JSONStyle{}.value);
-    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", gRef, str);
+    const auto REF = RefDump(fmtster::JSONStyle{});
+    ASSERT_EQ(fmtster::JSONStyle{}.value, fmtster::Base::GetDefaultJSONStyle().value) << F("current default JSONStyle: {},\ninitial default str: {}", REF, str);
 }
 
 TEST_F(FmtsterTest, JSONStyle_Style_0)
@@ -929,22 +956,22 @@ cout << str << endl;
 TEST_F(FmtsterTest, pairs)
 {
     string ref = "{\n  \"foo\" : \"bar\"\n}, {\n  \"foobar\" : 7\n}";
-    string str = F("{}, {}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    string str = F("{}, {}", make_pair("foo", "bar"), make_pair("foobar", 7));
 cout << "ONE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "\"foo\" : \"bar\", \"foobar\" : 7";
-    str = F("{:,-b}, {:,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:,-b}, {:,-b}", make_pair("foo", "bar"), make_pair("foobar", 7));
 cout << "TWO:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "{\n    \"foo\" : \"bar\"\n  }, {\n    \"foobar\" : 7\n  }";
-    str = F("{:1}, {:1}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:1}, {:1}", make_pair("foo", "bar"), make_pair("foobar", 7));
 cout << "THREE:\n" << str << endl;
     EXPECT_EQ(ref, str);
 
     ref = "  \"foo\" : \"bar\", \"foobar\" : 7";
-    str = F("{:1,-b}, {:,-b}", make_pair("foo"s, "bar"s), make_pair("foobar"s, 7));
+    str = F("{:1,-b}, {:,-b}", make_pair("foo", "bar"), make_pair("foobar", 7));
 cout << "FOUR:\n" << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -954,7 +981,7 @@ TEST_F(FmtsterTest, custom_indent_pairs)
     const string ref = "    \"fu\" : \"baz\", \"fubar\" : 3.14";
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:1,-b,{},j}, {:,-b}", make_pair("fu"s, "baz"s), style.value, make_pair("fubar"s, 3.14));
+    string str = F("{:1,-b,{},j}, {:,-b}", make_pair("fu", "baz"), style.value, make_pair("fubar", 3.14));
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -967,7 +994,7 @@ TEST_F(FmtsterTest, NestedPairs)
         "}";
     fmtster::JSONStyle style;
     style.tabCount = 4;
-    string str = F("{:,-b,{},j}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
+    string str = F("{:,-b,{},j}", make_pair("foo", make_pair("bar", "baz")), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -975,7 +1002,7 @@ cout << str << endl;
         "    \"foo\" : {\n"
         "        \"bar\" : \"baz\"\n"
         "    }";
-    str = F("{:1,-b,{},j}", make_pair("foo"s, make_pair("bar"s, "baz"s)), style.value);
+    str = F("{:1,-b,{},j}", make_pair("foo", make_pair("bar", "baz")), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -1010,7 +1037,7 @@ cout << str << endl;
         "        ]\n"
         "    }\n"
         "}";
-    str = F("{:,-b,{},j}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
+    str = F("{:,-b,{},j}", make_pair("foo", make_pair("bar", mapofvectorofstrings)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 
@@ -1027,7 +1054,7 @@ cout << str << endl;
     "            ]\n"
     "        }\n"
     "    }";
-    str = F("{:1,-b,{},j}", make_pair("foo"s, make_pair("bar"s, mapofvectorofstrings)), style.value);
+    str = F("{:1,-b,{},j}", make_pair("foo", make_pair("bar", mapofvectorofstrings)), style.value);
 cout << str << endl;
     EXPECT_EQ(ref, str);
 }
@@ -1078,11 +1105,11 @@ cout << str << endl;
 TEST_F(FmtsterTest, Tuple)
 {
     const auto tup = make_tuple(
-        make_pair("int"s, 25),
-        make_pair("string"s, "Hello"s),
-        make_pair("float"s, 9.31f),
-        make_pair("vector"s, vector<int>{3, 1, 4}),
-        make_pair("boolean"s, true));
+        make_pair("int", 25),
+        make_pair("string", "Hello"),
+        make_pair("float", 9.31f),
+        make_pair("vector", vector<int>{3, 1, 4}),
+        make_pair("boolean", true));
     fmtster::JSONStyle style;
     style.tabCount = 4;
    string str = F("{:1,-b,{},j}", tup, style.value);
@@ -1121,38 +1148,38 @@ TEST_F(FmtsterTest, Layers)
 //     F("{}", fmtster::JSONStyle{});
 
     // pair
-    auto pr = make_pair("key"s, "value"s);
+    auto pr = make_pair("key", "value");
     string str = F("{}", pr);
-    EXPECT_EQ("{\n  \"key\" : \"value\"\n}"s, str);
+    EXPECT_EQ("{\n  \"key\" : \"value\"\n}", str);
     str = F("{:,-b}", pr);
-    EXPECT_EQ("\"key\" : \"value\""s, str);
+    EXPECT_EQ("\"key\" : \"value\"", str);
     str = F("{:1}", pr);
-    EXPECT_EQ("{\n    \"key\" : \"value\"\n  }"s, str);
+    EXPECT_EQ("{\n    \"key\" : \"value\"\n  }", str);
     str = F("{:1,-b}", pr);
-    EXPECT_EQ("  \"key\" : \"value\""s, str);
+    EXPECT_EQ("  \"key\" : \"value\"", str);
     // tuple
-    auto tup = make_tuple("string"s, 1, true, 3.14);
+    auto tup = make_tuple("string", 1, true, 3.14);
     str = F("{}", tup);
-    EXPECT_EQ("{\n  \"string\",\n  1,\n  true,\n  3.14\n}"s, str);
+    EXPECT_EQ("{\n  \"string\",\n  1,\n  true,\n  3.14\n}", str);
     str = F("{:,-b}", tup);
-    EXPECT_EQ("\"string\",\n1,\ntrue,\n3.14"s, str);
+    EXPECT_EQ("\"string\",\n1,\ntrue,\n3.14", str);
     str = F("{:1}", tup);
-    EXPECT_EQ("{\n    \"string\",\n    1,\n    true,\n    3.14\n  }"s, str);
+    EXPECT_EQ("{\n    \"string\",\n    1,\n    true,\n    3.14\n  }", str);
     str = F("{:1,-b}", tup);
-    EXPECT_EQ("  \"string\",\n  1,\n  true,\n  3.14"s, str);
-    auto mm2 = multimap<string, map<string, int> >{ { "mm1"s, { { "one"s, 1 }, { "two"s, 2 }, { "three"s, 3 } } },
-                                                    { "mm2"s, { { "four"s, 4 }, { "five"s, 5 } } },
-                                                    { "mm1"s, { { "six"s, 6 }, { "seven"s, 7 } } } };
+    EXPECT_EQ("  \"string\",\n  1,\n  true,\n  3.14", str);
+    auto mm2 = multimap<string, map<string, int> >{ { "mm1", { { "one", 1 }, { "two", 2 }, { "three", 3 } } },
+                                                    { "mm2", { { "four", 4 }, { "five", 5 } } },
+                                                    { "mm1", { { "six", 6 }, { "seven", 7 } } } };
     str = F("{}", mm2);
-    EXPECT_EQ("{\n  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]\n}"s,
+    EXPECT_EQ("{\n  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]\n}",
               str);
     str = F("{:,-b}", mm2);
-    EXPECT_EQ("\"mm1\" : [\n  {\n    \"seven\" : 7,\n    \"six\" : 6\n  },\n  {\n    \"one\" : 1,\n    \"three\" : 3,\n    \"two\" : 2\n  }\n],\n\"mm2\" : [\n  {\n    \"five\" : 5,\n    \"four\" : 4\n  }\n]"s,
+    EXPECT_EQ("\"mm1\" : [\n  {\n    \"seven\" : 7,\n    \"six\" : 6\n  },\n  {\n    \"one\" : 1,\n    \"three\" : 3,\n    \"two\" : 2\n  }\n],\n\"mm2\" : [\n  {\n    \"five\" : 5,\n    \"four\" : 4\n  }\n]",
               str);
     str = F("{:1}", mm2);
-    EXPECT_EQ("{\n    \"mm1\" : [\n      {\n        \"seven\" : 7,\n        \"six\" : 6\n      },\n      {\n        \"one\" : 1,\n        \"three\" : 3,\n        \"two\" : 2\n      }\n    ],\n    \"mm2\" : [\n      {\n        \"five\" : 5,\n        \"four\" : 4\n      }\n    ]\n  }"s,
+    EXPECT_EQ("{\n    \"mm1\" : [\n      {\n        \"seven\" : 7,\n        \"six\" : 6\n      },\n      {\n        \"one\" : 1,\n        \"three\" : 3,\n        \"two\" : 2\n      }\n    ],\n    \"mm2\" : [\n      {\n        \"five\" : 5,\n        \"four\" : 4\n      }\n    ]\n  }",
               str);
     str = F("{:1,-b}", mm2);
-    EXPECT_EQ("  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]"s,
+    EXPECT_EQ("  \"mm1\" : [\n    {\n      \"seven\" : 7,\n      \"six\" : 6\n    },\n    {\n      \"one\" : 1,\n      \"three\" : 3,\n      \"two\" : 2\n    }\n  ],\n  \"mm2\" : [\n    {\n      \"five\" : 5,\n      \"four\" : 4\n    }\n  ]",
               str);
 }

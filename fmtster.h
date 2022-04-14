@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#define FMTSTER_VERSION 000500 // 0.5.0
+#define FMTSTER_VERSION 000501 // 0.5.1
 
 #include <algorithm>
 #include <cstdint>
@@ -32,11 +32,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <iostream>
-using std::cout;
-using std::endl;
-using std::boolalpha;
 
 namespace fmtster
 {
@@ -68,22 +63,23 @@ string F(std::string_view fmt, const Args&... args)
 //
 enum JSS
 {
-    BLANK               = 0x0,
-    reserved_1          = 0x1,
-    SPACE               = 0x2,
-    SPACEx2             = 0x3,
-    reserved_4          = 0x4,
-    reserved_5          = 0x5,
-    TAB                 = 0x6,
-    TABx2               = 0x7,
-    NEWLINE             = 0x8,
-    reserved_9          = 0x9,
-    NEWLINE_SPACE       = 0xA,
-    NEWLINE_SPACEx2     = 0xB,
-    reserved_C          = 0xC,
-    reserved_D          = 0xD,
-    NEWLINE_TAB         = 0xE,
-    NEWLINE_TABx2       = 0xF
+    // gaps                   options
+    BLANK           = 0x0,  PACKED = 0x0,
+    reserved_1      = 0x1,  SAMELINE = 0x1,
+    SPACE           = 0x2,  reserved_2 = 0x2,
+    SPACEx2         = 0x3,  SAMESTYLE = 0x3,
+    reserved_4      = 0x4,
+    reserved_5      = 0x5,
+    TAB             = 0x6,
+    TABx2           = 0x7,
+    NEWLINE         = 0x8,
+    reserved_9      = 0x9,
+    NEWLINE_SPACE   = 0xA,
+    NEWLINE_SPACEx2 = 0xB,
+    reserved_C      = 0xC,
+    reserved_D      = 0xD,
+    NEWLINE_TAB     = 0xE,
+    NEWLINE_TABx2   = 0xF
 }; // enum JSS
 
 //
@@ -118,8 +114,9 @@ enum JSS
                                                                                \
         unsigned int emptyArray : 2;                                           \
         unsigned int emptyObject : 2;                                          \
-        unsigned int sva : 2;                                                  \
-        unsigned int svo : 2;                                                  \
+                                                                               \
+        unsigned int singleLineArray : 2;                                      \
+        unsigned int singleLineObject : 2;                                     \
     }
 
 #else
@@ -127,6 +124,8 @@ enum JSS
 // @@@ TODO: See above (only these are currently implemented)
 #define JSONSTYLESTRUCT                                                        \
     {                                                                          \
+        bool cr : 1;                                                           \
+        bool lf : 1;                                                           \
         bool hardTab : 1;                                                      \
         unsigned int tabCount : 4;                                             \
     }
@@ -334,8 +333,6 @@ union ForwardJSONStyle
 constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
 {
     {
-#if false // @@@ disable members that are not implemented
-
 #ifdef _WIN32
         .cr = true,
         .lf = true,
@@ -346,8 +343,6 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
         .cr = false,
         .lf = true,
 #endif
-
-#endif // false
 
         .hardTab = false,
         .tabCount = 2,
@@ -368,8 +363,9 @@ constexpr internal::ForwardJSONStyle DEFAULTJSONCONFIG =
 
         .emptyArray = JSS::SPACE,
         .emptyObject = JSS::SPACE,
-        .sva = JSS::SAMELINE,
-        .svo = JSS::SAMELINE
+
+        .singleLineArray = JSS::SAMELINE,
+        .singleLineObject = JSS::SAMELINE
 
 #endif // false
 
@@ -408,13 +404,14 @@ struct StyleHelper
     {
         VALUE_T value;
         JSONStyle jsonStyle;    // never actually referenced
-        // XMLStyle xmlStyle;      // never actually references
+        // XMLStyle xmlStyle;      // never actually referenced
     } mStyle;
 
     //
     // Common expanded strings
     //
-    string tab;
+    string mNewline;
+    string mTab;
 
     StyleHelper(VALUE_T value)
       : mStyle{value}
@@ -515,11 +512,35 @@ struct StyleHelper
 class JSONStyleHelper
   : public StyleHelper
 {
+protected:
     VALUE_T mLastStyleValue;
 
+#if false // @@@ TODO
+
+    string mArrayGap[3];
+    string mObjectGap[7];
+    string mEmptyArray;
+    string mEmptyObject;
+
+#endif // false
+
+    string expand(unsigned int bfv)
+    {
+        using namespace std::string_literals;
+
+        string e;
+        if (bfv & 8)
+            e += mNewline;
+        if ((bfv & 3) == 3)
+            e += (bfv & 4) ? mTab + mTab : "  "s;
+        else if ((bfv & 3) == 2)
+            e += (bfv & 4) ? mTab : " "s;
+        return e;
+    } // expand()
+
 public:
-    JSONStyleHelper(VALUE_T value = DEFAULTJSONCONFIG.value)
-      : StyleHelper(value ? value : DEFAULTJSONCONFIG.value),
+    JSONStyleHelper(VALUE_T val = DEFAULTJSONCONFIG.value)
+      : StyleHelper(val ? val : DEFAULTJSONCONFIG.value),
         mLastStyleValue(0)
     {
         updateExpansions();
@@ -589,12 +610,38 @@ public:
         if (!mLastStyleValue || (mLastStyleValue != mStyle.value))
         {
             const JSONStyle style(mStyle.value);
-            tab = style.hardTab
-                  ? string(style.tabCount, '\t')
-                  : string(style.tabCount, ' ');
+
+            if (style.cr)
+                mNewline = "\r";
+            if (style.lf)
+                mNewline += "\n";
+
+            mTab = style.hardTab
+                   ? string(style.tabCount, '\t')
+                   : string(style.tabCount, ' ');
             mLastStyleValue = mStyle.value;
+
+#if false // @@@ TODO
+
+            mArrayGap[0] = expand(style.gapA);
+            mArrayGap[1] = expand(style.gapB);
+            mArrayGap[2] = expand(style.gapB);
+
+            mObjectGap[0] = expand(style.gap1);
+            mObjectGap[1] = expand(style.gap2);
+            mObjectGap[2] = expand(style.gap3);
+            mObjectGap[3] = expand(style.gap4);
+            mObjectGap[4] = expand(style.gap5);
+            mObjectGap[5] = expand(style.gap6);
+            mObjectGap[6] = expand(style.gap7);
+
+            mEmptyArray = expand(style.emptyArray);
+            mEmptyObject = expand(style.emptyObject);
+
+#endif // false
+
         }
-    }
+    } // updateExpansions()
 }; // class JSONStyleHelper
 
 } // namespace internal
@@ -686,12 +733,14 @@ public:
         mDisableBras(false)
     {}
 
-    // Parses the format in the format {<indent>,<per-call-parms>,<style>,<format>}
+    //
+    // Generic parser for however many comma-separated arguments are provided,
+    // including support for nested arguments (requires call to
+    // Base::resolveArgs() in Base children's format()).
+    //
     template<typename ParseContext>
     constexpr auto parse(ParseContext& ctx)
     {
-        // generic handling of N comma-separated arguments, including recursive braces
-
         int parmIndex = 0;
         int braces = 1;
         auto it = ctx.begin();
@@ -723,17 +772,18 @@ public:
         }
 
         return it;
+
     } // parse()
 
-
-
+    //
     // This function must be called by each Base child immediately on
-    //  entry to the format() function. It completes the updating of the style
-    //  object based on arguments provided, if necessary.
+    // entry to the format() function. It completes the updating of the style
+    // object based on arguments provided, including nested, if necessary.
+    // Only the first four aguments are processed.
+    //
     template<typename FormatContext>
     void resolveArgs(FormatContext& ctx)
     {
-        using namespace std::string_literals;
         using fmt::format_to;
         using namespace fmtster::internal;
 
@@ -741,7 +791,9 @@ public:
         mArgData.resize(4, "");
         mNestedArgIndex.resize(4, 0);
 
-
+        //
+        // Resolve each argument
+        //
 
         //
         // format
@@ -799,7 +851,7 @@ public:
                 [](auto value) -> VALUE_T
                 {
                     // This construct is required because at compile time all
-                    //  type paths are linked, even though that are not allowed
+                    //  type paths are linked, even though they are not allowed
                     //  at run time, and without this, the return value doens't
                     //  match the function return value in some cases, so the
                     //  compile fails.
@@ -855,7 +907,7 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: (only strings accepted)",
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: {} (only strings accepted)",
                                                   typeid(value).name()));
                     }
                 },
@@ -883,7 +935,7 @@ public:
                     }
                     else
                     {
-                        throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: (only integers accepted)",
+                        throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: {} (only integers accepted)",
                                                   typeid(value).name()));
                     }
                 },
@@ -906,16 +958,17 @@ public:
 
         mpStyleHelper->updateExpansions();
 
-        // expand indenting
+        //
+        // Configure indentation
+        //
         mBraIndent.clear();
         for (auto i = mIndentSetting; i; --i)
-            mBraIndent += mpStyleHelper->tab;
-        mDataIndent = mBraIndent + mpStyleHelper->tab;
+            mBraIndent += mpStyleHelper->mTab;
+        mDataIndent = mBraIndent + mpStyleHelper->mTab;
 
-
-
-
-        // parse those parms
+        //
+        // Parse the per call parms
+        //
         bool negate = false;
         for (const auto c : pcpSetting)
         {
@@ -993,7 +1046,7 @@ struct fmt::formatter<T,
             bool isFirstElement = (itC == c.begin());
             bool newLine = !mDisableBras || !isFirstElement;
             if (newLine)
-                fmtStr = "\n";
+                fmtStr = mpStyleHelper->mNewline;
 
             // get current element value
             const auto& val = *itC;
@@ -1056,7 +1109,7 @@ struct fmt::formatter<T,
             bool isFirstElement = (itC == c.begin());
             bool newLine = !mDisableBras || !isFirstElement;
             if (newLine)
-                fmtStr = "\n";
+                fmtStr = mpStyleHelper->mNewline;
 
             // output the key
             const auto& key = itC->first;
@@ -1123,12 +1176,14 @@ struct fmt::formatter<T,
             {
                 // output closing brace
                 itFC = format_to(itFC,
-                                is_braceable_v<T> ? "\n{}}}" : "\n{}]",
+                                is_braceable_v<T> ? "{}{}}}" : "{}{}]",
+                                mpStyleHelper->mNewline,
                                 mBraIndent);
             }
         }
 
         return itFC;
+
     } // format()
 
 }; // struct fmt::formatter< containers >
@@ -1193,7 +1248,7 @@ struct fmt::formatter<std::pair<T1, T2> >
         // output opening bracket/brace (if enabled)
         if (!mDisableBras)
         {
-            itFC = format_to(itFC, "{{\n");
+            itFC = format_to(itFC, "{{{}", mpStyleHelper->mNewline);
             mIndentSetting++;
         }
 
@@ -1232,11 +1287,11 @@ struct fmt::formatter<std::pair<T1, T2> >
         // output closing bracket/brace (if enabled)
         if (!mDisableBras)
         {
-            itFC = format_to(itFC, "\n{}}}", mBraIndent);
+            itFC = format_to(itFC, "{}{}}}", mpStyleHelper->mNewline, mBraIndent);
         }
 
         return itFC;
-    }
+    } // format()
 }; // struct fmt::formatter<std::pair<> >
 
 //
@@ -1283,7 +1338,7 @@ struct fmt::formatter<std::tuple<Ts...> >
                 {
                     std::string fmtStr;
                     if (!mDisableBras || (count != sizeof...(Ts)))
-                        fmtStr = "\n";
+                        fmtStr = mpStyleHelper->mNewline;
 
                     if (fmtster::internal::is_fmtsterable_v<decltype(elem)>)
                     {
@@ -1316,12 +1371,12 @@ struct fmt::formatter<std::tuple<Ts...> >
             // output closing brace (if enabled)
             if (!mDisableBras)
             {
-                itFC = format_to(itFC, "\n{}}}", mBraIndent);
+                itFC = format_to(itFC, "{}{}}}", mpStyleHelper->mNewline, mBraIndent);
             }
         }
 
         return itFC;
-    }
+    } // format()
 }; // struct fmt::formatter<std::tuple<> >
 
 //
@@ -1334,7 +1389,6 @@ struct fmt::formatter<fmtster::JSONStyle>
     template<typename FormatContext>
     auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
     {
-        using namespace std::string_literals;
         using std::make_pair;
 
         resolveArgs(ctx);
@@ -1342,30 +1396,31 @@ struct fmt::formatter<fmtster::JSONStyle>
         auto itFC = ctx.out();
 
         const auto tup = std::make_tuple(
-            make_pair("value"s, style.value),
-#if false // @@@ disable members that are not implemented
-            make_pair("cr"s, style.cr),
-            make_pair("lf"s, style.lf),
-#endif // false
-            make_pair("hardTab"s, style.hardTab),
-            make_pair("tabCount"s, style.tabCount)
-#if false // @@@ disable members that are not implemented
+            make_pair("value", style.value),
+            make_pair("cr", style.cr),
+            make_pair("lf", style.lf),
+            make_pair("hardTab", style.hardTab),
+            make_pair("tabCount", style.tabCount)
+
+#if false // @@@ TODO
             ,
-            make_pair("gapA"s, style.gapA),
-            make_pair("gapB"s, style.gapB),
-            make_pair("gapC"s, style.gapC),
-            make_pair("gap1"s, style.gap1),
-            make_pair("gap2"s, style.gap2),
-            make_pair("gap3"s, style.gap3),
-            make_pair("gap4"s, style.gap4),
-            make_pair("gap5"s, style.gap5),
-            make_pair("gap6"s, style.gap6),
-            make_pair("gap7"s, style.gap7),
-            make_pair("emptyArray"s, style.emptyArray),
-            make_pair("emptyObject"s, style.emptyObject),
-            make_pair("sva"s, style.sva),
-            make_pair("svo"s, style.svo)
+            make_pair("gapA", style.gapA),
+            make_pair("gapB", style.gapB),
+            make_pair("gapC", style.gapC),
+            make_pair("gap1", style.gap1),
+            make_pair("gap2", style.gap2),
+            make_pair("gap3", style.gap3),
+            make_pair("gap4", style.gap4),
+            make_pair("gap5", style.gap5),
+            make_pair("gap6", style.gap6),
+            make_pair("gap7", style.gap7),
+            make_pair("emptyArray", style.emptyArray),
+            make_pair("emptyObject", style.emptyObject),
+            make_pair("singleLineArray", style.singleLineArray),
+            make_pair("singleLineObject", style.singleLineObject)
+
 #endif // false
+
         );
         auto pcp = mDisableBras ? "-b" : "";
         itFC = fmt::format_to(itFC,
@@ -1377,7 +1432,7 @@ struct fmt::formatter<fmtster::JSONStyle>
                             mFormatSetting);
 
         return itFC;
-    }
+    } // format()
 };
 
 #undef JSONSTYLESTRUCT
