@@ -1,0 +1,4 @@
+FMT_INCLUDE_PATH="../fmt/include"
+FMT_LIBRARY_PATH="../fmt/build"
+
+make CFLAGS="-I${FMT_INCLUDE_PATH}" LFLAGS="-L${FMT_LIBRARY_PATH}"
