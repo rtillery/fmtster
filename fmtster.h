@@ -565,12 +565,12 @@ public:
     // if any other type)--Design needed to keep compiler happy below
     //
     template<typename T>
-    T escapeIfString(const T& val)
+    T escapeIfString(const T& val) const
     {
         return val;
     }
     // escape string the JSON way
-    string escapeIfString(const string& strIn)
+    string escapeIfString(const string& strIn) const
     {
         string strOut;
         strOut.reserve(strIn.length() * 6);
@@ -660,27 +660,27 @@ protected:
     static constexpr size_t FORMAT_ARG_INDEX = 3;
 
     // Results of parse() for use in format()
-    vector<string> mArgData;
-    vector<unsigned int> mNestedArgIndex;
+    mutable vector<string> mArgData;
+    mutable vector<unsigned int> mNestedArgIndex;
 
     // From format arg (int due to code in formatToValue(const char*))
-    int mFormatSetting;
+    mutable int mFormatSetting;
 
     // From style arg
-    std::unique_ptr<internal::StyleHelper> mpStyleHelper;
-    std::reference_wrapper<internal::VALUE_T> mStyleValue;
+    mutable std::unique_ptr<internal::StyleHelper> mpStyleHelper;
+    mutable internal::VALUE_T mStyleValue;
 
     //
     // From per call parms arg
     //
-    bool mDisableBras;
+    mutable bool mDisableBras;
 
     // From indent arg
-    size_t mIndentSetting;
+    mutable size_t mIndentSetting;
 
     // Expanded indent strings
-    string mBraIndent;  // brace/bracket indent
-    string mDataIndent; // data indent
+    mutable string mBraIndent;  // brace/bracket indent
+    mutable string mDataIndent; // data indent
 
     static int& DefaultFormat()
     {
@@ -697,7 +697,7 @@ protected:
     // Function to pass along string to specified format type helper for
     // escaping
     template<typename T>
-    T escapeIfString(int format, const T& val)
+    T escapeIfString(int format, const T& val) const
     {
         switch (format)
         {
@@ -782,7 +782,7 @@ public:
     // Only the first four aguments are processed.
     //
     template<typename FormatContext>
-    void resolveArgs(FormatContext& ctx)
+    void resolveArgs(FormatContext& ctx) const
     {
         using fmt::format_to;
         using namespace fmtster::internal;
@@ -801,7 +801,7 @@ public:
         if (mNestedArgIndex[FORMAT_ARG_INDEX])
         {
             auto formatArg = ctx.arg(mNestedArgIndex[FORMAT_ARG_INDEX]);
-            auto formatSetting = visit_format_arg(
+            auto formatSetting = formatArg.visit(
                 [this](auto value) -> int
                 {
                     // This construct is required because at compile time all
@@ -823,8 +823,7 @@ public:
                         throw fmt::format_error(F("fmtster: unsupported nested argument type for format: {} (only integers and strings accepted)",
                                                   typeid(value).name()));
                     }
-                },
-                formatArg
+                }
             );
 
             mFormatSetting = formatSetting;
@@ -847,7 +846,7 @@ public:
         if (mNestedArgIndex[STYLE_ARG_INDEX])
         {
             auto styleArg = ctx.arg(mNestedArgIndex[STYLE_ARG_INDEX]);
-            styleSetting = visit_format_arg(
+            styleSetting = styleArg.visit(
                 [](auto value) -> VALUE_T
                 {
                     // This construct is required because at compile time all
@@ -864,8 +863,7 @@ public:
                         throw fmt::format_error(F("fmtster: unsupported nested argument type for style: {} (only integers accepted--pass XXXStyle.value, not XXXStyle)",
                                                   typeid(value).name()));
                     }
-                },
-                styleArg
+                }
             );
         }
         else if(!mArgData[STYLE_ARG_INDEX].empty())
@@ -897,7 +895,7 @@ public:
         if (mNestedArgIndex[PER_CALL_ARG_INDEX])
         {
             auto pcpArg = ctx.arg(mNestedArgIndex[PER_CALL_ARG_INDEX]);
-            pcpSetting = visit_format_arg(
+            pcpSetting = pcpArg.visit(
                 [](auto value) -> string
                 {
                     if constexpr (std::disjunction_v<std::is_same<simplify_type<const char*>, simplify_type<decltype(value)> >,
@@ -910,8 +908,8 @@ public:
                         throw fmt::format_error(F("fmtster: unsupported nested argument type for per call parameters: {} (only strings accepted)",
                                                   typeid(value).name()));
                     }
-                },
-                pcpArg);
+                }
+            );
         }
         else if (!mArgData[PER_CALL_ARG_INDEX].empty())
         {
@@ -926,7 +924,7 @@ public:
         if (mNestedArgIndex[INDENT_ARG_INDEX])
         {
             auto indentArg = ctx.arg(mNestedArgIndex[INDENT_ARG_INDEX]);
-            auto indentSetting = visit_format_arg(
+            auto indentSetting = indentArg.visit(
                 [](auto value) -> int
                 {
                     if constexpr (std::is_integral_v<simplify_type<decltype(value)> >)
@@ -938,8 +936,8 @@ public:
                         throw fmt::format_error(F("fmtster: unsupported nested argument type for indent: {} (only integers accepted)",
                                                   typeid(value).name()));
                     }
-                },
-                indentArg);
+                }
+            );
 
             mIndentSetting = indentSetting;
         }
@@ -1032,7 +1030,7 @@ struct fmt::formatter<T,
     //
     template<typename FormatContext, typename C = T>
     std::enable_if_t<std::negation_v<fmtster::internal::is_multimappish<C> > >
-        format_loop(const C& c, FCIt_t<FormatContext>& itFC)
+        format_loop(const C& c, FCIt_t<FormatContext>& itFC) const
     {
         using namespace fmtster::internal;
 
@@ -1095,7 +1093,7 @@ struct fmt::formatter<T,
     //
     template<typename FormatContext, typename C = T>
     std::enable_if_t<fmtster::internal::is_multimappish_v<C> >
-        format_loop(const C& c, FCIt_t<FormatContext>& itFC)
+        format_loop(const C& c, FCIt_t<FormatContext>& itFC) const
     {
         using namespace fmtster::internal;
 
@@ -1146,7 +1144,7 @@ struct fmt::formatter<T,
     // format()
     //
     template<typename FormatContext>
-    auto format(const T& sc, FormatContext& ctx)
+    auto format(const T& sc, FormatContext& ctx) const
     {
         using fmt::format_to;
         using namespace fmtster::internal;
@@ -1222,7 +1220,7 @@ struct fmt::formatter<A,
     } // GetAdapterContainer()
 
     template<typename FormatContext>
-    auto format(const A& ac, FormatContext& ctx)
+    auto format(const A& ac, FormatContext& ctx) const
     {
         return fmt::format_to(ctx.out(), mStrFmt, GetAdapterContainer(ac));
     }
@@ -1236,7 +1234,7 @@ struct fmt::formatter<std::pair<T1, T2> >
   : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const std::pair<T1, T2>& p, FormatContext& ctx)
+    auto format(const std::pair<T1, T2>& p, FormatContext& ctx) const
     {
         using fmt::format_to;
         using namespace fmtster::internal;
@@ -1303,7 +1301,7 @@ struct fmt::formatter<std::tuple<Ts...> >
   : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const std::tuple<Ts...>& tup, FormatContext& ctx)
+    auto format(const std::tuple<Ts...>& tup, FormatContext& ctx) const
     {
         using fmt::format_to;
         using namespace fmtster::internal;
@@ -1387,7 +1385,7 @@ struct fmt::formatter<fmtster::JSONStyle>
     : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const fmtster::JSONStyle& style, FormatContext& ctx)
+    auto format(const fmtster::JSONStyle& style, FormatContext& ctx) const
     {
         using std::make_pair;
 

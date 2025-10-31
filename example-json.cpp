@@ -83,7 +83,7 @@ struct fmt::formatter<Person1>
   : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const Person1& p, FormatContext& ctx)
+    auto format(const Person1& p, FormatContext& ctx) const
     {
         // direct approach (take special care with commas and carriage returns!)
 
@@ -157,7 +157,7 @@ struct fmt::formatter<Person2>
   : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const Person2& p, FormatContext& ctx)
+    auto format(const Person2& p, FormatContext& ctx) const
     {
         // tuple approach
 
@@ -232,7 +232,7 @@ struct fmt::formatter<Color>
   : fmtster::Base
 {
     template<typename FormatContext>
-    auto format(const Color& color, FormatContext& ctx)
+    auto format(const Color& color, FormatContext& ctx) const
     {
         using std::make_pair;
 
