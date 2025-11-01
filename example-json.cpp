@@ -1,4 +1,5 @@
-/* Copyright (c) 2021 Harman International Industries, Incorporated.  All rights reserved.
+/* Copyright (c) 2021 Harman International Industries, Incorporated.  All rights
+ * reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -87,26 +88,28 @@ struct fmt::formatter<Person1>
     {
         // direct approach (take special care with commas and carriage returns!)
 
+        auto& d = *mpData; // alias helper for accessing data
+
         resolveArgs(ctx);
 
         auto itFC = ctx.out();
 
-        const auto indent = mDisableBras ? mBraIndent : mDataIndent;
+        const auto indent = d.mDisableBras ? d.mBraIndent : d.mDataIndent;
 
         // output opening brace (if enabled)
-        if (!mDisableBras)
+        if (!d.mDisableBras)
         {
             itFC = format_to(itFC, "{{\n");
-            mIndentSetting++;
+            d.mIndentSetting++;
         }
 
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("name", p.name),
-                         mIndentSetting,
+                         d.mIndentSetting,
                          "-b",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mStyleValue,
+                         d.mFormatSetting);
 
         // @@@ TODO: Wrap this section for use with C++20
         stringstream ss;
@@ -117,36 +120,36 @@ struct fmt::formatter<Person1>
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("birthdate", ss.str()),
-                         mIndentSetting,
+                         d.mIndentSetting,
                          "-b",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mStyleValue,
+                         d.mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("salary", p.salary),
-                         mIndentSetting,
+                         d.mIndentSetting,
                          "-b",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mStyleValue,
+                         d.mFormatSetting);
         itFC = format_to(itFC,
                          "{:{},{},{},{}},\n",
                          mp("phones", p.phones),
-                         mIndentSetting,
+                         d.mIndentSetting,
                          "-b",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mStyleValue,
+                         d.mFormatSetting);
 
         // Note this entry's format string does not end a comma
         itFC = format_to(itFC,
                          "{:{},{},{},{}}",
                          mp("family", p.family),
-                         mIndentSetting,
+                         d.mIndentSetting,
                          "-b",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mStyleValue,
+                         d.mFormatSetting);
 
-        if (!mDisableBras)
-            itFC = fmt::format_to(itFC, "\n{}}}", mBraIndent);
+        if (!d.mDisableBras)
+            itFC = fmt::format_to(itFC, "\n{}}}", d.mBraIndent);
 
         return itFC;
     }
@@ -159,6 +162,8 @@ struct fmt::formatter<Person2>
     template<typename FormatContext>
     auto format(const Person2& p, FormatContext& ctx) const
     {
+        auto& d = *mpData; // alias helper for accessing data
+
         // tuple approach
 
         resolveArgs(ctx);
@@ -179,10 +184,10 @@ struct fmt::formatter<Person2>
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
                          tup,
-                         mIndentSetting,
-                         mDisableBras ? "-b" : "",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mIndentSetting,
+                         d.mDisableBras ? "-b" : "",
+                         d.mStyleValue,
+                         d.mFormatSetting);
     }
 };
 
@@ -234,6 +239,8 @@ struct fmt::formatter<Color>
     template<typename FormatContext>
     auto format(const Color& color, FormatContext& ctx) const
     {
+        auto& d = *mpData; // alias helper for accessing data
+
         using std::make_pair;
 
         resolveArgs(ctx);
@@ -245,10 +252,10 @@ struct fmt::formatter<Color>
         return format_to(ctx.out(),
                          "{:{},{},{},{}}",
                          tup,
-                         mIndentSetting,
-                         mDisableBras ? "-b" : "",
-                         mStyleValue,
-                         mFormatSetting);
+                         d.mIndentSetting,
+                         d.mDisableBras ? "-b" : "",
+                         d.mStyleValue,
+                         d.mFormatSetting);
     }
 };
 
@@ -273,6 +280,58 @@ public:
 // #define BENCHMARK
 #define BENCHMARK Benchmark bench(__func__)
 
+using BoolMap_t = map<string, bool>;
+
+string Serialize_BoolMap_Defaults(const BoolMap_t& boolmap)
+{
+    string str;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+            str = F("{}", boolmap);
+    }
+    return str;
+}
+
+string Serialize_BoolMap_EightCharStyleAndDefault(const BoolMap_t& boolmap)
+{
+    fmtster::JSONStyle eightCharStyle;
+    eightCharStyle.tabCount = 8;
+    fmtster::JSONStyle initialStyle;
+
+    string str;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+        {
+            str = F("{:,,{},j}", boolmap, eightCharStyle.value);
+            str = F("{:,,{},j}", boolmap, initialStyle.value);
+        }
+    }
+    return str;
+}
+
+string Serialize_BoolMap_EightCharAndHardTabAndDefault(const BoolMap_t& boolmap)
+{
+    fmtster::JSONStyle eightCharStyle;
+    eightCharStyle.tabCount = 8;
+    fmtster::JSONStyle hardTabStyle;
+    hardTabStyle.hardTab = true;
+    fmtster::JSONStyle initialStyle;
+
+    string str;
+    {
+        BENCHMARK;
+        for (int i = 100000; i; --i)
+        {
+            str = F("{:,,{},j}", boolmap, eightCharStyle.value);
+            str = F("{:,,{},j}", boolmap, hardTabStyle.value);
+            str = F("{:,,{},j}", boolmap, initialStyle.value);
+        }
+    }
+    return str;
+}
+
 int main()
 {
     // Benchmarks
@@ -281,44 +340,19 @@ int main()
         { "true", true }, { "false", false }, { "maybe", false }
     };
 
-    string str;
-    {
-        BENCHMARK;
-        for (int i = 100000; i; --i)
-            str = F("{}", boolmap);
-    }
-
-    fmtster::JSONStyle initialStyle;
-    fmtster::JSONStyle eightCharStyle;
-    eightCharStyle.tabCount = 8;
-    {
-        BENCHMARK;
-        for (int i = 100000; i; --i)
-        {
-            str = F("{:,,{},json}", boolmap, eightCharStyle.value);
-            str = F("{:,,{},json}", boolmap, initialStyle.value);
-        }
-    }
-
-    fmtster::JSONStyle hardTabStyle;
-    hardTabStyle.hardTab = true;
-    {
-        BENCHMARK;
-        for (int i = 100000; i; --i)
-        {
-            str = F("{:,,{},json}", boolmap, eightCharStyle.value);
-            str = F("{:,,{},json}", boolmap, hardTabStyle.value);
-            str = F("{:,,{},json}", boolmap, initialStyle.value);
-        }
-    }
-
+    string str = Serialize_BoolMap_Defaults(boolmap);
+    str = Serialize_BoolMap_EightCharStyleAndDefault(boolmap);
+    str = Serialize_BoolMap_EightCharAndHardTabAndDefault(boolmap);
+ 
     // Based on https://json.org/example.html
     auto GlossSeeAlso = vector<string>{ "GML", "XML" };
-    auto GlossDef = mt(mp("para", "A meta-markup language, used to create markup languages such as DocBook."),
+    auto GlossDef = mt(mp("para", "A meta-markup language, used to create "
+                                  "markup languages such as DocBook."),
                        mp("GlossSeeAlso", GlossSeeAlso));
     auto GlossEntry = mt(mp("ID", "SGML"),
                          mp("SortAs", "SGML"),
-                         mp("GlossTerm", "Standard Generalized Markup Language"),
+                         mp("GlossTerm",
+                            "Standard Generalized Markup Language"),
                          mp("Acronym", "SGML"),
                          mp("Abbrev", "ISO 8879:1986"),
                          mp("GlossDef", GlossDef),
