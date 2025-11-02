@@ -21,7 +21,7 @@
  * SOFTWARE.
  */
 
-#define FMTSTER_VERSION 000501 // 0.5.1
+#define FMTSTER_VERSION 000600 // 0.6.0
 
 #include <algorithm>
 #include <cstdint>
